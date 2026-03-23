@@ -564,7 +564,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = 8765
+    import os
+    port = int(os.environ.get("PORT", 8765))
     print(f"""
 Turnajovy scheduler - Prague Crocodiles
 Otevri: http://localhost:{port}
@@ -573,4 +574,4 @@ Zastav: Ctrl+C
 Clenove:""")
     for team, members in MEMBERS_BY_TEAM.items():
         print(f"  {team}: {', '.join(members)}")
-    HTTPServer(("localhost", port), Handler).serve_forever()
+    HTTPServer(("", port), Handler).serve_forever()
