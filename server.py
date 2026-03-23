@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turnajovy scheduler - Prague Crocodiles"""
 
-import asyncio, json, datetime, urllib.request
+import asyncio, json, datetime, urllib.request, os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
@@ -11,6 +11,11 @@ try:
 except ImportError:
     SPOND_AVAILABLE = False
     print("pip install spond")
+
+# Spond credentials z Railway environment variables
+SPOND_USERNAME = os.environ.get("SPOND_USERNAME", "")
+SPOND_PASSWORD = os.environ.get("SPOND_PASSWORD", "")
+SPOND_GROUP_ID = os.environ.get("SPOND_GROUP_ID", "DDEC85288D0442F38F280F4420E045DC")
 
 MEMBERS_BY_TEAM = {
     "Muži": [
@@ -43,8 +48,8 @@ STATE = {
     "assignments": [],
     "stats": {},
     "selected_event_ts": None,
-    "preferences": {},  # jmeno -> "ref" | "server" | None
-    "vocas": [],  # jmena Vocasu - vzdy dostupni
+    "preferences": {},
+    "vocas": [],
 }
 
 def fetch_tournify_firebase(live_link):
@@ -96,7 +101,7 @@ def fetch_tournify_firebase(live_link):
 
     teams_docs = fs_list(f"tournaments/{tournament_id}/teams")
     poule_team_map = {}
-    team_id_map = {}  # doc_id -> name
+    team_id_map = {}
     for t in teams_docs:
         tf = t.get("fields", {})
         name = fv(tf.get("name", {})) or "?"
@@ -124,7 +129,6 @@ def fetch_tournify_firebase(live_link):
         t2 = fv(mf.get("team2", {}))
         home = poule_team_map.get((poule_id, t1), f"Tym {t1}")
         away = poule_team_map.get((poule_id, t2), f"Tym {t2}")
-        # Rozhodci - pole "referee" obsahuje doc ID tymu
         ref_doc_id = fv(mf.get("referee", {})) or ""
         ref_team_name = team_id_map.get(ref_doc_id, "")
         day_ts = day_map[day_id]
@@ -136,7 +140,6 @@ def fetch_tournify_firebase(live_link):
             "home": home, "away": away, "ref_team": ref_team_name,
             "field": f"Kurt {int(field_num)+1}" if str(field_num).isdigit() else str(field_num),
             "poule": poule_map.get(poule_id, ""),
-
         })
 
     matches.sort(key=lambda x: (x["day_ts"], x["st"]))
@@ -144,24 +147,24 @@ def fetch_tournify_firebase(live_link):
     return matches
 
 
-async def fetch_spond_events(username, password, group_id, day_timestamps):
-    """Nacte vsechny nadchazejici akce, oznaci ktere sednou na Tournify dny."""
-    s = spond_lib.Spond(username=username, password=password)
+async def _spond_events(day_timestamps):
+    s = spond_lib.Spond(username=SPOND_USERNAME, password=SPOND_PASSWORD)
     try:
         now = datetime.datetime.now(datetime.timezone.utc)
-        events = await s.get_events(group_id=group_id, min_start=now,
+        events = await s.get_events(group_id=SPOND_GROUP_ID, min_start=now,
                                      max_end=now + datetime.timedelta(days=90))
         result = []
         for event in events:
             try:
-                dt = datetime.datetime.fromisoformat(event.get("startTimestamp","").replace("Z","+00:00"))
+                dt = datetime.datetime.fromisoformat(event.get("startTimestamp", "").replace("Z", "+00:00"))
                 event_ts = int(dt.timestamp())
                 day_str = dt.strftime("%d. %m. %Y")
-            except: continue
+            except:
+                continue
             matches_tournify = any(abs(event_ts - d) < 86400 * 1.5 for d in day_timestamps)
             result.append({
-                "id": event.get("id",""),
-                "name": event.get("heading","(bez nazvu)"),
+                "id": event.get("id", ""),
+                "name": event.get("heading", "(bez názvu)"),
                 "day": day_str,
                 "ts": event_ts,
                 "matches_tournify": matches_tournify,
@@ -172,24 +175,24 @@ async def fetch_spond_events(username, password, group_id, day_timestamps):
         await s.clientsession.close()
 
 
-async def fetch_spond_attendance(username, password, group_id, event_id):
-    """Nacte ucast pro konkretni akci."""
-    s = spond_lib.Spond(username=username, password=password)
+async def _spond_attendance(event_id):
+    s = spond_lib.Spond(username=SPOND_USERNAME, password=SPOND_PASSWORD)
     try:
         now = datetime.datetime.now(datetime.timezone.utc)
-        events = await s.get_events(group_id=group_id, min_start=now,
+        events = await s.get_events(group_id=SPOND_GROUP_ID, min_start=now,
                                      max_end=now + datetime.timedelta(days=90))
         found_event = next((e for e in events if e.get("id") == event_id), None)
         if not found_event:
             return {"found": False, "message": "Akce nenalezena."}
 
-        group = await s.get_group(group_id)
+        group = await s.get_group(SPOND_GROUP_ID)
         import unicodedata
         def clean_name(first, last):
             name = f"{first} {last}".strip()
             name = unicodedata.normalize("NFC", name)
-            return " ".join(name.split())  # odstran dvojite mezery
-        id_to_name = {m["id"]: clean_name(m.get("firstName",""), m.get("lastName",""))
+            return " ".join(name.split())
+
+        id_to_name = {m["id"]: clean_name(m.get("firstName", ""), m.get("lastName", ""))
                       for m in group.get("members", [])}
 
         responses = found_event.get("responses", {})
@@ -205,7 +208,7 @@ async def fetch_spond_attendance(username, password, group_id, event_id):
         all_ids = set(id_to_name.keys())
 
         try:
-            dt = datetime.datetime.fromisoformat(found_event.get("startTimestamp","").replace("Z","+00:00"))
+            dt = datetime.datetime.fromisoformat(found_event.get("startTimestamp", "").replace("Z", "+00:00"))
             event_ts = int(dt.timestamp())
         except:
             event_ts = None
@@ -223,14 +226,9 @@ async def fetch_spond_attendance(username, password, group_id, event_id):
 
 
 def get_active_members(attending_names, vocas=None):
-    """
-    attending_names: seznam jmen potvrzenych hracu (None = vsichni)
-    vocas: seznam jmen "Vocasu" - pridaji se vzdy, bez ohledu na attending
-    """
     import unicodedata
     def norm(s):
         s = unicodedata.normalize("NFC", s).strip()
-        # odstran dvojite mezery, normalize apostrofy
         return " ".join(s.split()).lower()
 
     if attending_names is None:
@@ -243,7 +241,6 @@ def get_active_members(attending_names, vocas=None):
             if present:
                 result[team] = present
 
-    # Vocasi - pridej do vsech tymu kde jsou clenove, pokud tam jeste nejsou
     if vocas:
         vocas_norm = {norm(v): v for v in vocas}
         for team, members in MEMBERS_BY_TEAM.items():
@@ -257,7 +254,6 @@ def get_active_members(attending_names, vocas=None):
     return result
 
 
-# Mapovani nazvu tymu z Tournify na nase podskupiny
 TOURNIFY_TO_SUBGROUP = {
     "Prague Crocodiles A MIX": "Mix A",
     "Prague Crocodiles B MIX": "Mix B",
@@ -265,33 +261,19 @@ TOURNIFY_TO_SUBGROUP = {
     "Prague Crocodiles Ž":     "Ženy",
 }
 
-# Kdo podava kdyz dany tym hraje
 PLAYING_SERVED_BY = {
-    "Mix A":  "Mix B",
-    "Mix B":  "Mix A",
+    "Mix A": "Mix B",
+    "Mix B": "Mix A",
     "Muži": "Ženy",
     "Ženy": "Muži",
 }
 
-# Kdo piska kdyz dany tym rozhodcuje
-REF_TEAM_WHISTLES = {
-    "Mix A":  "Mix A",
-    "Mix B":  "Mix B",
-    "Muži": "Muži",
-    "Ženy": "Ženy",
-}
-
 
 def tournify_to_sg(team_name):
-    """Prevede nazev tymu z Tournify na nazev podskupiny, nebo None."""
     return TOURNIFY_TO_SUBGROUP.get(team_name)
 
 
 def assign_duties(matches, subgroups, preferences=None, vocas=None):
-    """
-    preferences: dict jmeno -> "ref" | "server" | None
-    vocas: list jmen - vzdy dostanou sluzbu pokud nehraji (bez ohledu na spravedlnost)
-    """
     if preferences is None:
         preferences = {}
     if vocas is None:
@@ -306,21 +288,16 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
         return mapping.get(name, name)
 
     norm_sg = {sg_key(k): v for k, v in subgroups.items()}
-
     all_members = {m: {"duties": 0, "busy_times": set()}
                    for ms in subgroups.values() for m in ms}
 
     result = []
     for match in matches:
-        slot = match["slot"]
-        # Pouzij cas jako klic busy - aby se kryly soubehy zapasu ve stejny cas
-        time_key = match.get("st") or match.get("time", str(slot))
-
+        time_key = match.get("st") or match.get("time", str(match["slot"]))
         home_sg = tournify_to_sg(match["home"])
         away_sg = tournify_to_sg(match["away"])
         playing_sgs = {sg_key(sg) for sg in [home_sg, away_sg] if sg}
 
-        # Celý hrající tým je busy
         for sg in playing_sgs:
             if sg in norm_sg:
                 for m in norm_sg[sg]:
@@ -331,10 +308,6 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
         whistle_sg = sg_key(ref_sg) if ref_sg else None
 
         def pick_n(sg_name, n, exclude=None, prefer_role=None):
-            """
-            Vyber n lidi. Vocasi jdou vzdy prvni (bez ohledu na pocet sluzeb).
-            Ostatni razeni: pocet sluzeb (spravedlnost), pri rovnosti preference.
-            """
             key = sg_key(sg_name) if sg_name else None
             if not key or key not in norm_sg:
                 return []
@@ -348,7 +321,7 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
             vocas_norm = {norm(v) for v in vocas}
 
             def sort_key(m):
-                is_vocas = norm(m) in vocas_norm  # Vocas jde vzdy prvni
+                is_vocas = norm(m) in vocas_norm
                 duties = all_members[m]["duties"]
                 pref = preferences.get(m)
                 if prefer_role is None:
@@ -359,7 +332,6 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
                     pref_score = 1
                 else:
                     pref_score = 2
-                # is_vocas=False (0) jde pred True (1) -> vocas ma prioritu
                 return (not is_vocas, duties, pref_score)
 
             pool.sort(key=sort_key)
@@ -369,20 +341,16 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
                 all_members[m]["busy_times"].add(time_key)
             return chosen
 
-        # Žádný Crocodiles tým se nezúčastní → přeskočit
         ref_is_crocodiles = whistle_sg and whistle_sg in norm_sg and whistle_sg not in playing_sgs
         playing_is_crocodiles = len(playing_sgs) > 0
 
         if not playing_is_crocodiles and not ref_is_crocodiles:
-            # Skryt - Crocodiles nic nedela
             continue
 
-        # ── Rozhodčí ──
         referees = []
         if ref_is_crocodiles:
             referees = pick_n(whistle_sg, 4, prefer_role="ref")
 
-        # ── Podávající ──
         serving_sg = None
         for sg in [home_sg, away_sg]:
             if sg:
@@ -393,7 +361,6 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
 
         servers = []
         if serving_sg:
-            # Vzdy vyluc uz vybrane rozhodci (bez ohledu na tym - clovek nemuze delat dve veci naraz)
             already = set(referees)
             servers = pick_n(serving_sg, 3, exclude=already, prefer_role="server")
 
@@ -406,11 +373,13 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
         })
     return result
 
+
 def compute_stats(assignments, subgroups):
     duty_count = {m: {"team": t, "count": 0} for t, ms in subgroups.items() for m in ms}
     for match in assignments:
         for m in match["referees"] + match["servers"]:
-            if m in duty_count: duty_count[m]["count"] += 1
+            if m in duty_count:
+                duty_count[m]["count"] += 1
     return duty_count
 
 
@@ -447,11 +416,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
-            with open("frontend.html", encoding="utf-8") as f:
-                self.send_html(f.read())
+            try:
+                with open("frontend.html", encoding="utf-8") as f:
+                    self.send_html(f.read())
+            except:
+                self.send_html("<h1>Prague Crocodiles Scheduler API</h1><p>Backend běží.</p>")
         elif path == "/api/status":
-            self.send_json({"members": {t: len(m) for t, m in STATE["members"].items()},
-                            "matches_loaded": len(STATE["matches"]), "attending": STATE["attending"]})
+            self.send_json({
+                "members": {t: len(m) for t, m in STATE["members"].items()},
+                "matches_loaded": len(STATE["matches"]),
+                "attending": STATE["attending"],
+                "spond_available": SPOND_AVAILABLE,
+                "spond_configured": bool(SPOND_USERNAME and SPOND_PASSWORD),
+            })
         elif path == "/api/assignments":
             self.send_json({"assignments": STATE["assignments"], "stats": STATE["stats"]})
         else:
@@ -473,27 +450,31 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"error": str(e)}, 400)
 
-        elif path == "/api/list_events":
+        # ── NOVÝ endpoint: Spond events (credentials z env) ──
+        elif path == "/api/spond_events":
             if not SPOND_AVAILABLE:
-                self.send_json({"error": "pip install spond"}, 500)
+                self.send_json({"error": "Spond knihovna není nainstalována"}, 500)
+                return
+            if not SPOND_USERNAME or not SPOND_PASSWORD:
+                self.send_json({"error": "SPOND_USERNAME / SPOND_PASSWORD nejsou nastaveny na serveru"}, 500)
                 return
             try:
-                events = asyncio.run(fetch_spond_events(
-                    data.get("username",""), data.get("password",""),
-                    data.get("group_id",""), STATE["day_timestamps"]))
+                day_timestamps = data.get("day_timestamps", STATE["day_timestamps"])
+                events = asyncio.run(_spond_events(day_timestamps))
                 self.send_json({"ok": True, "events": events})
             except Exception as e:
                 self.send_json({"error": str(e)}, 400)
 
-        elif path == "/api/check_attendance":
+        # ── NOVÝ endpoint: Spond attendance (credentials z env) ──
+        elif path == "/api/spond_attendance":
             if not SPOND_AVAILABLE:
-                self.send_json({"error": "pip install spond"}, 500)
+                self.send_json({"error": "Spond knihovna není nainstalována"}, 500)
+                return
+            if not SPOND_USERNAME or not SPOND_PASSWORD:
+                self.send_json({"error": "SPOND_USERNAME / SPOND_PASSWORD nejsou nastaveny na serveru"}, 500)
                 return
             try:
-                result = asyncio.run(fetch_spond_attendance(
-                    data.get("username",""), data.get("password",""),
-                    data.get("group_id",""), data.get("event_id","")))
-                # Uloz event_ts do STATE pro filtrovani zapasu
+                result = asyncio.run(_spond_attendance(data.get("event_id", "")))
                 if result.get("event_ts"):
                     STATE["selected_event_ts"] = result["event_ts"]
                 self.send_json({"ok": True, **result})
@@ -501,14 +482,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(e)}, 400)
 
         elif path == "/api/set_vocas":
-            # {"vocas": ["Petr Marschall", "jakub kopac"]}
             STATE["vocas"] = data.get("vocas", [])
-            # Prepocitej aktivni cleny s novymi vocasy
             STATE["members"] = get_active_members(STATE["attending"], STATE["vocas"])
             self.send_json({"ok": True, "vocas": STATE["vocas"]})
 
         elif path == "/api/set_preferences":
-            # {"preferences": {"Jan Novak": "ref", "Eva Nova": "server", "Petr X": null}}
             STATE["preferences"] = {k: v for k, v in data.get("preferences", {}).items() if v}
             self.send_json({"ok": True, "count": len(STATE["preferences"])})
 
@@ -516,13 +494,11 @@ class Handler(BaseHTTPRequestHandler):
             attending = data.get("attending", None)
             STATE["attending"] = attending
             STATE["members"] = get_active_members(attending, STATE.get("vocas", []))
-            # Volitelne: rucne vybrane datum (pres date picker)
             if data.get("selected_event_ts"):
                 STATE["selected_event_ts"] = data["selected_event_ts"]
             self.send_json({"ok": True, "active": {t: len(m) for t, m in STATE["members"].items()}})
 
         elif path == "/api/replace_player":
-            # {"slot": 5, "old_name": "Jan Novak", "new_name": "Petr Stary"}
             slot = data.get("slot")
             old_name = data.get("old_name", "")
             new_name = data.get("new_name", "")
@@ -542,16 +518,16 @@ class Handler(BaseHTTPRequestHandler):
 
         elif path == "/api/assign":
             if not STATE["matches"]:
-                self.send_json({"error": "Nacti nejdriv rozpis z Tournify"}, 400)
+                self.send_json({"error": "Načti nejdřív rozpis z Tournify"}, 400)
                 return
             try:
-                # Filtruj zapasy pro vybrane datum (den Spond akce)
                 matches_to_use = STATE["matches"]
                 if STATE.get("selected_event_ts"):
                     evt_ts = STATE["selected_event_ts"]
                     matches_to_use = [m for m in STATE["matches"]
                                       if abs(m["day_ts"] - evt_ts) < 86400 * 1.5]
-                assignments = assign_duties(matches_to_use, STATE["members"], STATE.get("preferences", {}), STATE.get("vocas", []))
+                assignments = assign_duties(matches_to_use, STATE["members"],
+                                            STATE.get("preferences", {}), STATE.get("vocas", []))
                 stats = compute_stats(assignments, STATE["members"])
                 STATE["assignments"] = assignments
                 STATE["stats"] = stats
@@ -564,14 +540,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 8765))
+    spond_status = "✅ nakonfigurován" if (SPOND_USERNAME and SPOND_PASSWORD) else "❌ chybí SPOND_USERNAME/SPOND_PASSWORD env vars"
     print(f"""
 Turnajovy scheduler - Prague Crocodiles
 Otevri: http://localhost:{port}
-Zastav: Ctrl+C
-
-Clenove:""")
-    for team, members in MEMBERS_BY_TEAM.items():
-        print(f"  {team}: {', '.join(members)}")
+Spond: {spond_status}
+""")
     HTTPServer(("", port), Handler).serve_forever()
