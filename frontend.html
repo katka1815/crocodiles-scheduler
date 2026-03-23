@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scheduler – Prague Crocodiles</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0f0f11;--surface:#18181c;--surface2:#222228;--border:#2e2e38;
+    --accent:#c8f135;--accent2:#6ee7ff;--accent3:#ff7eb3;
+    --text:#eeeef0;--muted:#7a7a8a;--danger:#ff5f5f;
+    --r:10px;--mono:'DM Mono',monospace;--sans:'Syne',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding:0 0 60px}
+  header{display:flex;align-items:center;gap:12px;padding:20px 32px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(15,15,17,.92);backdrop-filter:blur(12px);z-index:100}
+  header h1{font-size:17px;font-weight:700}header h1 span{color:var(--accent)}
+  .pill{font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:99px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+  .pill.ok{color:var(--accent);border-color:var(--accent)}
+  main{max-width:1060px;margin:36px auto;padding:0 28px;display:grid;gap:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .card-header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .step-num{width:26px;height:26px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--muted);flex-shrink:0}
+  .step-num.done{background:var(--accent);color:#000;border-color:var(--accent)}
+  .card-title{font-size:14px;font-weight:600}
+  .card-body{padding:18px 20px}
+  label{display:block;font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase}
+  input[type=text],input[type=password],input[type=email]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;padding:9px 13px;outline:none;transition:border-color .15s}
+  input:focus{border-color:var(--accent)}
+  .fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .btn{font-family:var(--sans);font-size:14px;font-weight:600;padding:9px 20px;border-radius:6px;border:none;cursor:pointer;transition:opacity .15s,transform .1s;display:inline-flex;align-items:center;gap:8px}
+  .btn:hover{opacity:.85}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.35;cursor:not-allowed}
+  .btn-primary{background:var(--accent);color:#000}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn-accent2{background:var(--accent2);color:#000}
+  .actions-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+  .alert{padding:11px 15px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:10px}
+  .alert-err{background:rgba(255,95,95,.1);border:1px solid rgba(255,95,95,.3);color:#ff8f8f}
+  .alert-ok{background:rgba(200,241,53,.08);border:1px solid rgba(200,241,53,.25);color:var(--accent)}
+  .alert-info{background:rgba(110,231,255,.08);border:1px solid rgba(110,231,255,.25);color:var(--accent2)}
+  .hidden{display:none!important}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+  .divider{display:flex;align-items:center;gap:12px;margin:16px 0}
+  .divider div{flex:1;height:1px;background:var(--border)}
+  .divider span{font-size:12px;color:var(--muted)}
+  /* Attendance grid */
+  .attend-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+  .attend-col h4{font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .name-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+  .name-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;background:var(--surface2);font-size:12px;font-family:var(--mono);cursor:pointer;user-select:none}
+  .name-item:hover{background:var(--border)}
+  .name-item input{accent-color:var(--accent)}
+  /* Match chips */
+  .matches-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:280px;overflow-y:auto;margin-top:12px}
+  .match-chip{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;font-size:12px}
+  .match-chip .time{font-family:var(--mono);color:var(--accent2);font-size:11px}
+  .match-chip .teams{font-weight:600;margin-top:3px}
+  /* Schedule */
+  .schedule-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
+  th{text-align:left;padding:9px 13px;color:var(--muted);font-size:11px;letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:9px 13px;border-bottom:1px solid rgba(46,46,56,.6);vertical-align:top}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;margin:1px}
+  .tag-ref{background:rgba(200,241,53,.15);color:var(--accent)}
+  .tag-srv{background:rgba(110,231,255,.12);color:var(--accent2)}
+  .tag-play{background:rgba(255,126,179,.12);color:var(--accent3)}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+  .team-stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:13px 15px}
+  .team-stat h4{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px}
+  .member-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono)}
+  .member-row:last-child{border-bottom:none}
+  .duty-bar-wrap{display:flex;align-items:center;gap:7px}
+  .duty-bar{height:3px;border-radius:2px;background:var(--accent);min-width:2px;transition:width .4s}
+  .duty-count{color:var(--accent);font-size:11px;min-width:14px;text-align:right}
+</style>
+</head>
+<body>
+<header>
+  <h1>Prague <span>Crocodiles</span> scheduler</h1>
+  <span id="hdr-tournify" class="pill">Tournify: nenačteno</span>
+  <span id="hdr-spond" class="pill">Spond: nepřipojen</span>
+</header>
+<main>
+
+<!-- KROK 1: Tournify -->
+<div class="card">
+  <div class="card-header">
+    <div class="step-num" id="step1-num">1</div>
+    <span class="card-title">Rozpis zápasů z Tournify</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Zadej URL turnaje — stáhne se celý rozvrh automaticky.</div>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px">
+        <label>URL nebo Live Link</label>
+        <input type="text" id="tournify-url" value="https://tournifyapp.com/live/cdbl2526/schedule">
+      </div>
+      <button class="btn btn-primary" onclick="loadTournify()">
+        <span id="t-spinner" class="spinner hidden"></span>
+        Načíst z Tournify
+      </button>
+    </div>
+    <div id="tournify-result" style="margin-top:10px"></div>
+    <div id="matches-preview"></div>
+  </div>
+</div>
+
+<!-- KROK 2: Spond účast -->
+<div class="card">
+  <div class="card-header">
+    <div class="step-num" id="step2-num">2</div>
+    <span class="card-title">Kdo přijde? (Spond)</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+      Spond najde akci odpovídající datu z Tournify a ukáže kdo potvrdil účast.
+      Pak můžeš seznam upravit ručně a potvrdit.
+    </div>
+    <div class="fields">
+      <div><label>E-mail</label><input type="email" id="spond-email" placeholder="tvůj@email.cz"></div>
+      <div><label>Heslo</label><input type="password" id="spond-pass" placeholder="••••••••"></div>
+      <div><label>Group ID</label><input type="text" id="spond-group" placeholder="DDEC85288D..." value="DDEC85288D0442F38F280F4420E045DC"></div>
+    </div>
+    <div class="actions-row">
+      <button class="btn btn-secondary" onclick="checkAttendance()">
+        <span id="s-spinner" class="spinner hidden"></span>
+        Zkontrolovat účast
+      </button>
+      <div id="spond-result"></div>
+    </div>
+    <div id="attendance-ui"></div>
+
+    <!-- Preference hráčů -->
+    <div id="prefs-section" style="margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <b style="font-size:13px">Preference hráčů <span style="font-weight:400;color:var(--muted)">(volitelné)</span></b>
+        <button class="btn btn-secondary" style="font-size:12px;padding:5px 12px" onclick="togglePrefs()">▼ Upravit</button>
+      </div>
+      <div id="prefs-body" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          Nastav preferovanou roli — ovlivní výběr při stejném počtu služeb, ale nezaručuje ji.
+        </div>
+        <div id="prefs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px"></div>
+        <button class="btn btn-secondary" style="margin-top:12px;font-size:12px" onclick="savePreferences()">Uložit preference</button>
+        <span id="prefs-saved" style="font-size:12px;color:var(--accent);margin-left:10px;display:none">✓ Uloženo</span>
+      </div>
+    </div>
+
+    <div class="divider"><div></div><span>nebo přeskoč a použij všechny členy</span><div></div></div>
+    <div id="manual-date-picker" style="display:none;margin-bottom:12px">
+      <label>Vyber datum herního dne</label>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div id="date-buttons" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
+    </div>
+    <button class="btn btn-secondary" onclick="showDatePicker()">Použít všechny členy (bez kontroly Spondu)</button>
+  </div>
+</div>
+
+<!-- KROK 3: Generovat -->
+<div class="card">
+  <div class="card-header">
+    <div class="step-num" id="step3-num">3</div>
+    <span class="card-title">Vygenerovat rozvrh</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+      Přiřadí 4 rozhodčí + 3 podávající ke každému zápasu spravedlivě.
+    </div>
+    <div class="actions-row">
+      <button class="btn btn-primary" id="btn-assign" onclick="generateSchedule()" disabled>
+        <span id="a-spinner" class="spinner hidden"></span>
+        Vygenerovat rozvrh
+      </button>
+      <div id="assign-result"></div>
+    </div>
+    <div id="schedule-output" style="margin-top:22px"></div>
+  </div>
+</div>
+
+</main>
+<script>
+const API = 'http://localhost:8765';
+let dayTimestamps = [];
+let attendanceData = null;
+
+function spinner(id, on) { document.getElementById(id).classList.toggle('hidden', !on); }
+
+function pill(id, text, ok) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'pill' + (ok ? ' ok' : '');
+}
+
+function checkReady() {
+  const t = document.getElementById('step1-num').classList.contains('done');
+  const s = document.getElementById('step2-num').classList.contains('done');
+  document.getElementById('btn-assign').disabled = !(t && s);
+}
+
+// Tournify
+async function loadTournify() {
+  const raw = document.getElementById('tournify-url').value.trim();
+  const m = raw.match(/\/live\/([^\/\?]+)/);
+  const live_link = m ? m[1] : raw;
+  spinner('t-spinner', true);
+  document.getElementById('tournify-result').innerHTML = '';
+  try {
+    const r = await fetch(API + '/api/load_tournify', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({live_link})
+    });
+    const data = await r.json();
+    spinner('t-spinner', false);
+    if (data.ok) {
+      dayTimestamps = data.day_timestamps || [];
+      document.getElementById('tournify-result').innerHTML =
+        '<div class="alert alert-ok">\u2713 Na\u010dteno ' + data.count + ' z\u00e1pas\u016f</div>';
+      renderMatchPreview(data.matches);
+      document.getElementById('step1-num').classList.add('done');
+      pill('hdr-tournify', 'Tournify: \u2713 ' + data.count + ' z\u00e1pas\u016f', true);
+      checkReady();
+    } else {
+      document.getElementById('tournify-result').innerHTML =
+        '<div class="alert alert-err">Chyba: ' + data.error + '</div>';
+    }
+  } catch(e) {
+    spinner('t-spinner', false);
+    document.getElementById('tournify-result').innerHTML =
+      '<div class="alert alert-err">Server nedostupn\u00fd: ' + e.message + '</div>';
+  }
+}
+
+function renderMatchPreview(matches) {
+  const chips = matches.slice(0, 30).map(function(m) {
+    return '<div class="match-chip">' +
+      '<div class="time">' + m.time + ' \u00b7 ' + m.field + '</div>' +
+      '<div class="teams">' + m.home + ' vs ' + m.away + '</div>' +
+      '<div style="font-size:11px;color:var(--muted)">' + m.poule + '</div>' +
+      '</div>';
+  }).join('');
+  document.getElementById('matches-preview').innerHTML =
+    '<div style="margin-top:12px;font-size:12px;color:var(--muted);margin-bottom:8px">' + matches.length + ' z\u00e1pas\u016f (zobrazuji prvn\u00edch 30):</div>' +
+    '<div class="matches-grid">' + chips + '</div>';
+}
+
+// Spond
+let spondCredentials = {};
+
+async function checkAttendance() {
+  const username = document.getElementById('spond-email').value.trim();
+  const password = document.getElementById('spond-pass').value;
+  const group_id = document.getElementById('spond-group').value.trim();
+  if (!username || !password || !group_id) {
+    document.getElementById('spond-result').innerHTML = '<div class="alert alert-err">Vypln\u011b p\u0159ihla\u0161ovac\u00ed \u00fadaje.</div>';
+    return;
+  }
+  if (!dayTimestamps.length) {
+    document.getElementById('spond-result').innerHTML = '<div class="alert alert-err">Nejd\u0159\u00edv na\u010dti Tournify rozpi\u0073.</div>';
+    return;
+  }
+  spondCredentials = {username, password, group_id};
+  spinner('s-spinner', true);
+  document.getElementById('spond-result').innerHTML = '<span style="color:var(--muted);font-size:13px">Na\u010d\u00edt\u00e1m akce ze Spondu\u2026</span>';
+  document.getElementById('attendance-ui').innerHTML = '';
+  try {
+    const r = await fetch(API + '/api/list_events', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, password, group_id})
+    });
+    const data = await r.json();
+    spinner('s-spinner', false);
+    if (!data.ok) {
+      document.getElementById('spond-result').innerHTML = '<div class="alert alert-err">Chyba: ' + data.error + '</div>';
+      return;
+    }
+    document.getElementById('spond-result').innerHTML =
+      '<div class="alert alert-ok">\u2713 Na\u010dteno ' + data.events.length + ' akc\u00ed ze Spondu</div>';
+    renderEventPicker(data.events);
+  } catch(e) {
+    spinner('s-spinner', false);
+    document.getElementById('spond-result').innerHTML = '<div class="alert alert-err">Server nedostupn\u00fd: ' + e.message + '</div>';
+  }
+}
+
+function renderEventPicker(events) {
+  const items = events.map(function(e) {
+    const highlight = e.matches_tournify ? 'border-color:var(--accent);background:rgba(200,241,53,.06)' : '';
+    const badge = e.matches_tournify ? '<span style="font-size:10px;background:var(--accent);color:#000;padding:1px 6px;border-radius:4px;margin-left:6px">\u2713 sed\u00ed Tournify</span>' : '';
+    const eid = e.id.replace(/'/g, "\\'");
+    const ename = e.name.replace(/'/g, "\\'");
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);' + highlight + ';cursor:pointer">' +
+      '<div><span style="font-weight:600;font-size:13px">' + e.name + '</span>' + badge +
+      '<div style="font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono)">' + e.day + '</div></div>' +
+      '<button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="loadEventAttendance(\'' + eid + '\',\'' + ename + '\')">Vybrat</button>' +
+      '</div>';
+  }).join('');
+  document.getElementById('attendance-ui').innerHTML =
+    '<div style="margin-top:14px;font-size:13px;color:var(--text);margin-bottom:10px">Vyber spr\u00e1vnou akci (zv\u00fdrazn\u011bn\u00e9 sed\u00ed na datum z Tournify):</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' + items + '</div>';
+}
+
+async function loadEventAttendance(event_id, event_name) {
+  document.getElementById('attendance-ui').innerHTML = '<div style="margin-top:14px;color:var(--muted);font-size:13px">Na\u010d\u00edt\u00e1m \u00fa\u010dast\u2026</div>';
+  try {
+    const r = await fetch(API + '/api/check_attendance', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(Object.assign({}, spondCredentials, {event_id: event_id}))
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      document.getElementById('attendance-ui').innerHTML = '<div class="alert alert-err" style="margin-top:10px">Chyba: ' + data.error + '</div>';
+      return;
+    }
+    pill('hdr-spond', 'Spond: \u2713 ' + data.event_name, true);
+    renderAttendanceUI(data);
+  } catch(e) {
+    document.getElementById('attendance-ui').innerHTML = '<div class="alert alert-err" style="margin-top:10px">Server nedostupn\u00fd: ' + e.message + '</div>';
+  }
+}
+
+function mkList(names, checked, dim) {
+  return names.map(function(n) {
+    return '<label class="name-item" style="' + (dim ? 'opacity:0.5' : '') + '">' +
+      '<input type="checkbox" name="attending" value="' + n + '" ' + (checked ? 'checked' : '') + '>' +
+      n + '</label>';
+  }).join('');
+}
+
+function renderAttendanceUI(data) {
+  document.getElementById('attendance-ui').innerHTML =
+    '<div style="margin-top:16px;font-size:13px;color:var(--text)">Zkontroluj a uprav seznam p\u0159\u00edtonn\u00fdch, pak potvrdi:</div>' +
+    '<div style="font-size:12px;color:var(--muted);margin-top:4px;margin-bottom:12px">' +
+    '\ud83d\udca1 <b style="color:var(--accent2)">Bez odpov\u011bdi</b> jsou za\u0161krtnut\u00ed \u2014 p\u0159ijeli, jen nezareagovali ve Spondu ("Vocasov\u00e9"). Od\u0161krtni je pokud opravdu nep\u0159ijedou.</div>' +
+    '<div class="attend-grid">' +
+      '<div><h4>\u2713 Potvrzeni (' + data.attending.length + ')</h4>' +
+      '<div class="name-list">' + mkList(data.attending, true, false) + '</div></div>' +
+      '<div><h4 style="color:var(--accent2)">? Bez odpov\u011bdi (' + data.unresponded.length + ')</h4>' +
+      '<div class="name-list">' + mkList(data.unresponded, true, false) + '</div></div>' +
+    '</div>' +
+    '<div style="margin-top:8px">' +
+      '<h4 style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' +
+      '\u2717 Odm\u00edtli (' + data.declined.length + ') \u2014 od\u0161krtni pokud p\u0159eci jen p\u0159ijedou</h4>' +
+      '<div class="name-list" style="max-height:100px">' + mkList(data.declined, false, true) + '</div>' +
+    '</div>' +
+    '<div class="actions-row" style="margin-top:14px">' +
+      '<button class="btn btn-primary" onclick="confirmAttendance()">Potvrdit tento seznam</button>' +
+    '</div>' +
+    '<div id="confirm-result" style="margin-top:8px"></div>' +
+    '<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<b style="font-size:13px">\ud83d\ude48 Vocasov\u00e9</b>' +
+        '<span style="font-size:12px;color:var(--muted)">p\u0159ijeli, ale nezareagovali ve Spondu \u2014 dostanou slu\u017ebu v\u017edy</span>' +
+      '</div>' +
+      '<div id="vocas-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input type="text" id="vocas-input" placeholder="Jm\u00e9no hr\u00e1\u010de..." ' +
+        'style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 11px;outline:none;width:200px" ' +
+        'oninput="showVocasSuggestions(this.value)" onkeydown="if(event.key===\'Enter\')addVocas()">' +
+        '<button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="addVocas()">P\u0159idat</button>' +
+      '</div>' +
+      '<div id="vocas-suggestions" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div>' +
+    '</div>';
+  renderVocasList();
+}
+
+async function confirmAttendance() {
+  const checkboxes = document.querySelectorAll('input[name="attending"]:checked');
+  const attending = Array.from(checkboxes).map(function(cb) { return cb.value; });
+  const r = await fetch(API + '/api/set_attending', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({attending: attending})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    const total = Object.values(data.active).reduce(function(a,b){return a+b;}, 0);
+    const teams = Object.entries(data.active).map(function(e){return e[0]+': '+e[1];}).join(', ');
+    document.getElementById('confirm-result').innerHTML =
+      '<div class="alert alert-ok">\u2713 Aktivn\u00ed hr\u00e1\u010di (' + total + '): ' + teams + '</div>';
+    document.getElementById('step2-num').classList.add('done');
+    checkReady();
+  }
+}
+
+// Vocas
+const ALL_MEMBERS = [
+  "Ales Hanacek","Jan Illetško","jakub kopáč","Jakub Strejc","marek Černý","Martin Černík",
+  "Petr Marschall","Samuel Lepšík","Tomáš reiter","Vil K",
+  "Anna Tomiová","Eliška Lněničková","Jana Možíšová","Jitka Vondráčková","Kamča K",
+  "Kateřina Jochová","Luci Beránkova","Lucie Vobořilová Vaňkátová","Vanesa Langerová",
+  "slv _"
+];
+let currentVocas = [];
+
+function showVocasSuggestions(q) {
+  const box = document.getElementById('vocas-suggestions');
+  if (!q || q.length < 2) { box.innerHTML = ''; return; }
+  const matches = ALL_MEMBERS.filter(function(n) {
+    return n.toLowerCase().includes(q.toLowerCase()) && !currentVocas.includes(n);
+  });
+  box.innerHTML = matches.map(function(n) {
+    const safe = n.replace(/'/g, "\\'");
+    return '<span style="padding:3px 10px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);font-size:12px;font-family:var(--mono);cursor:pointer" onclick="selectVocas(\'' + safe + '\')">' + n + '</span>';
+  }).join('');
+}
+
+function selectVocas(name) {
+  document.getElementById('vocas-input').value = '';
+  document.getElementById('vocas-suggestions').innerHTML = '';
+  if (!currentVocas.includes(name)) {
+    currentVocas.push(name);
+    saveVocas();
+    renderVocasList();
+  }
+}
+
+function addVocas() {
+  const input = document.getElementById('vocas-input');
+  const val = input.value.trim();
+  if (!val) return;
+  const match = ALL_MEMBERS.find(function(n) { return n.toLowerCase() === val.toLowerCase(); });
+  if (match && !currentVocas.includes(match)) {
+    currentVocas.push(match);
+    saveVocas();
+    renderVocasList();
+  }
+  input.value = '';
+  document.getElementById('vocas-suggestions').innerHTML = '';
+}
+
+function removeVocas(name) {
+  currentVocas = currentVocas.filter(function(n) { return n !== name; });
+  saveVocas();
+  renderVocasList();
+}
+
+function renderVocasList() {
+  const el = document.getElementById('vocas-list');
+  if (!el) return;
+  el.innerHTML = currentVocas.map(function(n) {
+    const safe = n.replace(/'/g, "\\'");
+    return '<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;background:rgba(255,126,179,.15);border:1px solid rgba(255,126,179,.3);font-size:12px;font-family:var(--mono)">' +
+      n + '<span style="cursor:pointer;color:var(--muted)" onclick="removeVocas(\'' + safe + '\')">\u2715</span></span>';
+  }).join('');
+}
+
+async function saveVocas() {
+  await fetch(API + '/api/set_vocas', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({vocas: currentVocas})
+  });
+}
+
+// Date picker / use all members
+function showDatePicker() {
+  if (!dayTimestamps.length) {
+    alert('Nejd\u0159\u00edv na\u010dti Tournify rozpi\u0073 (krok 1).');
+    return;
+  }
+  const picker = document.getElementById('manual-date-picker');
+  picker.style.display = 'block';
+  const container = document.getElementById('date-buttons');
+  const days = dayTimestamps.slice().sort();
+  container.innerHTML = days.map(function(ts) {
+    const d = new Date(ts * 1000);
+    const label = d.toLocaleDateString('cs-CZ', {day:'numeric', month:'long', year:'numeric'});
+    return '<button class="btn btn-secondary date-btn" style="font-size:13px" data-ts="' + ts + '" onclick="selectDate(' + ts + ', this)">' + label + '</button>';
+  }).join('');
+}
+
+function selectDate(ts, btn) {
+  document.querySelectorAll('.date-btn').forEach(function(b) {
+    b.style.borderColor = '';
+    b.style.color = '';
+  });
+  btn.style.borderColor = 'var(--accent)';
+  btn.style.color = 'var(--accent)';
+  useAllMembers(ts);
+}
+
+async function useAllMembers(selectedTs) {
+  const r = await fetch(API + '/api/set_attending', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({attending: null, selected_event_ts: selectedTs || null})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    const total = Object.values(data.active).reduce(function(a,b){return a+b;}, 0);
+    const d = selectedTs ? new Date(selectedTs * 1000).toLocaleDateString('cs-CZ', {day:'numeric', month:'long'}) : 'v\u0161echny dny';
+    document.getElementById('attendance-ui').innerHTML =
+      '<div class="alert alert-ok" style="margin-top:12px">\u2713 Pou\u017eity v\u0161ichni \u010dlenov\u00e9 (' + total + ' hr\u00e1\u010d\u016f) \u00b7 datum: ' + d + '</div>';
+    document.getElementById('step2-num').classList.add('done');
+    checkReady();
+  }
+}
+
+// Preferences
+let currentPreferences = {};
+
+function togglePrefs() {
+  const body = document.getElementById('prefs-body');
+  const visible = body.style.display !== 'none';
+  body.style.display = visible ? 'none' : 'block';
+  if (!visible) renderPrefsGrid();
+}
+
+function renderPrefsGrid() {
+  const grid = document.getElementById('prefs-grid');
+  grid.innerHTML = ALL_MEMBERS.map(function(name) {
+    const pref = currentPreferences[name] || '';
+    const safe = name.replace(/'/g, "\\'");
+    return '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px">' +
+      '<span style="font-size:12px;font-family:var(--mono)">' + name + '</span>' +
+      '<div style="display:flex;gap:4px">' +
+        '<button style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:' + (pref==='ref'?'rgba(200,241,53,.2)':'var(--surface)') + ';color:' + (pref==='ref'?'var(--accent)':'var(--muted)') + '" onclick="setPref(\'' + safe + '\',\'ref\')">rozhodč\u00ed</button>' +
+        '<button style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:' + (pref==='server'?'rgba(110,231,255,.2)':'var(--surface)') + ';color:' + (pref==='server'?'var(--accent2)':'var(--muted)') + '" onclick="setPref(\'' + safe + '\',\'server\')">podava\u010d</button>' +
+        '<button style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);cursor:pointer;background:' + (!pref?'rgba(122,122,138,.2)':'var(--surface)') + ';color:' + (!pref?'var(--text)':'var(--muted)') + '" onclick="setPref(\'' + safe + '\',\'any\')">je mi to jedno</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function setPref(name, val) {
+  if (val === 'any' || currentPreferences[name] === val) {
+    delete currentPreferences[name];
+  } else {
+    currentPreferences[name] = val;
+  }
+  renderPrefsGrid();
+}
+
+async function savePreferences() {
+  const r = await fetch(API + '/api/set_preferences', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({preferences: currentPreferences})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    const el = document.getElementById('prefs-saved');
+    el.style.display = 'inline';
+    setTimeout(function(){ el.style.display = 'none'; }, 2000);
+  }
+}
+
+// Generate schedule
+async function generateSchedule() {
+  spinner('a-spinner', true);
+  document.getElementById('assign-result').innerHTML = '';
+  try {
+    const r = await fetch(API + '/api/assign', {method:'POST'});
+    const data = await r.json();
+    spinner('a-spinner', false);
+    if (data.ok) {
+      document.getElementById('assign-result').innerHTML = '<div class="alert alert-ok">\u2713 Rozvrh vygenerov\u00e1n</div>';
+      document.getElementById('step3-num').classList.add('done');
+      renderSchedule(data.assignments, data.stats);
+    } else {
+      document.getElementById('assign-result').innerHTML = '<div class="alert alert-err">Chyba: ' + data.error + '</div>';
+    }
+  } catch(e) {
+    spinner('a-spinner', false);
+    document.getElementById('assign-result').innerHTML = '<div class="alert alert-err">Server nedostupn\u00fd: ' + e.message + '</div>';
+  }
+}
+
+function renderSchedule(assignments, stats) {
+  window._lastAssignments = assignments;
+  const maxD = Math.max.apply(null, Object.values(stats).map(function(s){return s.count;}));
+
+  function clickableTag(name, slot, role, cls) {
+    const safe = name.replace(/'/g, "\\'");
+    return '<span class="tag ' + cls + '" style="cursor:pointer" title="Klikni pro nahrazen\u00ed" onclick="openReplaceModal(' + slot + ',\'' + safe + '\',\'' + role + '\')">' + name + '</span>';
+  }
+
+  const rows = assignments.map(function(m) {
+    return '<tr>' +
+      '<td style="color:var(--accent2);white-space:nowrap">' + m.time + '</td>' +
+      '<td style="white-space:nowrap">' + m.field + '</td>' +
+      '<td><b>' + m.home + '</b> vs <b>' + m.away + '</b></td>' +
+      '<td>' + m.playing.map(function(t){return '<span class="tag tag-play">'+t+'</span>';}).join('') + '</td>' +
+      '<td><div style="color:var(--muted);font-size:11px">' + (m.ref_team !== '-' ? m.ref_team : '') + '</div>' +
+        m.referees.map(function(r){return clickableTag(r, m.slot, 'ref', 'tag-ref');}).join('') + '</td>' +
+      '<td><div style="color:var(--muted);font-size:11px">' + (m.serving_team !== '-' ? m.serving_team : '') + '</div>' +
+        m.servers.map(function(s){return clickableTag(s, m.slot, 'server', 'tag-srv');}).join('') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  const teamNames = [];
+  Object.values(stats).forEach(function(s){ if(!teamNames.includes(s.team)) teamNames.push(s.team); });
+  const teamCards = teamNames.map(function(team) {
+    const members = Object.entries(stats).filter(function(e){return e[1].team===team;}).sort(function(a,b){return b[1].count-a[1].count;});
+    return '<div class="team-stat"><h4>' + team + '</h4>' +
+      members.map(function(e){
+        const name = e[0], v = e[1];
+        const w = Math.round(v.count / (maxD||1) * 50);
+        return '<div class="member-row"><span>' + name + '</span>' +
+          '<div class="duty-bar-wrap"><div class="duty-bar" style="width:' + w + 'px"></div>' +
+          '<span class="duty-count">' + v.count + '</span></div></div>';
+      }).join('') + '</div>';
+  }).join('');
+
+  document.getElementById('schedule-output').innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">' +
+      '<b style="font-size:14px">Rozvrh slu\u017eeb</b>' +
+      '<div style="display:flex;gap:10px;align-items:center">' +
+        '<span class="tag tag-play">\u25cf hraje</span>' +
+        '<span class="tag tag-ref">\u25cf rozhodč\u00ed</span>' +
+        '<span class="tag tag-srv">\u25cf pod\u00e1v\u00e1n\u00ed</span>' +
+        '<button class="btn btn-accent2" onclick="downloadPNG()">\u2b07 PNG</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="schedule-wrap" id="sched-table-wrap">' +
+      '<table><thead><tr><th>Čas</th><th>Kurt</th><th>Zápas</th><th>Hrají</th><th>Rozhodčí (4)</th><th>Podávání (3)</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>' +
+    '</div>' +
+    '<div style="margin-top:24px"><b style="font-size:14px;display:block;margin-bottom:12px">Spravedlnost</b>' +
+      '<div class="stats-grid">' + teamCards + '</div></div>';
+}
+
+// Replace player
+function openReplaceModal(slot, oldName, role) {
+  const match = window._lastAssignments.find(function(m){return m.slot===slot;});
+  const busy = new Set([].concat(match.referees||[]).concat(match.servers||[]).concat(match.playing||[]));
+  busy.delete(oldName);
+  const available = ALL_MEMBERS.filter(function(n){return !busy.has(n) && n!==oldName;});
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center';
+  modal.className = 'modal-wrap';
+  modal.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:320px;max-width:420px;max-height:80vh;display:flex;flex-direction:column;gap:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<b style="font-size:14px">Nahradit: <span style="color:var(--accent3)">' + oldName + '</span></b>' +
+        '<button onclick="document.querySelector(\'.modal-wrap\').remove()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">\u2715</button>' +
+      '</div>' +
+      '<input type="text" placeholder="Hledat..." oninput="filterReplace(this.value)" ' +
+        'style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 12px;outline:none">' +
+      '<div id="replace-list" style="overflow-y:auto;display:flex;flex-direction:column;gap:4px;max-height:300px">' +
+        available.map(function(n){
+          const safe = n.replace(/'/g,"\\'");
+          return '<div class="replace-item" style="padding:8px 12px;border-radius:6px;background:var(--surface2);cursor:pointer;font-size:13px;font-family:var(--mono)" ' +
+            'onmouseover="this.style.background=\'var(--border)\'" onmouseout="this.style.background=\'var(--surface2)\'" ' +
+            'onclick="doReplace(' + slot + ',\'' + oldName.replace(/'/g,"\\'") + '\',\'' + safe + '\')">' + n + '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function filterReplace(q) {
+  document.querySelectorAll('.replace-item').forEach(function(el){
+    el.style.display = el.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+async function doReplace(slot, oldName, newName) {
+  document.querySelector('.modal-wrap') && document.querySelector('.modal-wrap').remove();
+  const r = await fetch(API + '/api/replace_player', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({slot: slot, old_name: oldName, new_name: newName})
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window._lastAssignments = data.assignments;
+    renderSchedule(data.assignments, data.stats);
+  } else {
+    alert('Chyba: ' + data.error);
+  }
+}
+
+async function downloadPNG() {
+  const el = document.getElementById('sched-table-wrap');
+  if (!window.html2canvas) {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(s);
+    await new Promise(function(res){ s.onload = res; });
+  }
+  const canvas = await html2canvas(el, {backgroundColor:'#18181c', scale:2});
+  const a = document.createElement('a');
+  a.download = 'rozvrh.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+</script>
+</body>
+</html>
