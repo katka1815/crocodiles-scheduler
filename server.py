@@ -50,7 +50,38 @@ STATE = {
     "selected_event_ts": None,
     "preferences": {},
     "vocas": [],
+    "schedule_label": "",   # popisek dne pro web
 }
+
+SAVE_FILE = "/data/schedule.json"
+
+def save_schedule():
+    """Uloží aktuální rozvrh do souboru (persistentní přes restarty)."""
+    try:
+        os.makedirs(os.path.dirname(SAVE_FILE), exist_ok=True)
+        data = {
+            "assignments": STATE["assignments"],
+            "stats": STATE["stats"],
+            "schedule_label": STATE.get("schedule_label", ""),
+        }
+        with open(SAVE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Nepodařilo se uložit rozvrh: {e}")
+
+def load_schedule():
+    """Načte uložený rozvrh při startu serveru."""
+    try:
+        with open(SAVE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        STATE["assignments"] = data.get("assignments", [])
+        STATE["stats"] = data.get("stats", {})
+        STATE["schedule_label"] = data.get("schedule_label", "")
+        print(f"Načten uložený rozvrh: {len(STATE['assignments'])} zápasů")
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"Chyba při načítání rozvrhu: {e}")
 
 def fetch_tournify_firebase(live_link):
     PROJECT = "tournamentsoftware-a1b3d"
@@ -430,7 +461,7 @@ class Handler(BaseHTTPRequestHandler):
                 "spond_configured": bool(SPOND_USERNAME and SPOND_PASSWORD),
             })
         elif path == "/api/assignments":
-            self.send_json({"assignments": STATE["assignments"], "stats": STATE["stats"]})
+            self.send_json({"assignments": STATE["assignments"], "stats": STATE["stats"], "schedule_label": STATE.get("schedule_label", "")})
         else:
             self.send_json({"error": "Not found"}, 404)
 
@@ -512,6 +543,7 @@ class Handler(BaseHTTPRequestHandler):
                             replaced = True
             if replaced:
                 STATE["stats"] = compute_stats(STATE["assignments"], STATE["members"])
+                save_schedule()
                 self.send_json({"ok": True, "assignments": STATE["assignments"], "stats": STATE["stats"]})
             else:
                 self.send_json({"error": "Hráč nenalezen v daném zápase"}, 400)
@@ -531,6 +563,10 @@ class Handler(BaseHTTPRequestHandler):
                 stats = compute_stats(assignments, STATE["members"])
                 STATE["assignments"] = assignments
                 STATE["stats"] = stats
+                # Uložit popisek dne pokud přišel v requestu
+                if data.get("schedule_label"):
+                    STATE["schedule_label"] = data["schedule_label"]
+                save_schedule()
                 self.send_json({"ok": True, "assignments": assignments, "stats": stats})
             except Exception as e:
                 self.send_json({"error": str(e)}, 400)
@@ -540,6 +576,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    load_schedule()
     port = int(os.environ.get("PORT", 8765))
     spond_status = "✅ nakonfigurován" if (SPOND_USERNAME and SPOND_PASSWORD) else "❌ chybí SPOND_USERNAME/SPOND_PASSWORD env vars"
     print(f"""
