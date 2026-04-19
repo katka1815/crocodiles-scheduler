@@ -344,7 +344,7 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
 
     result = []
     for match in matches:
-        time_key = match.get("st") or match.get("time", str(match["slot"]))
+        time_key = match.get("time") or match.get("st") or str(match["slot"])
         home_sg = tournify_to_sg(match["home"])
         away_sg = tournify_to_sg(match["away"])
         playing_sgs = {sg_key(sg) for sg in [home_sg, away_sg] if sg}
