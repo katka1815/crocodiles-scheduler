@@ -60,14 +60,28 @@
     .search-input::placeholder { color: #475569; }
     .search-input:focus { border-color: #3b82f6; }
 
-    .team-filters {
+    /* ── Filter rows ── */
+    .filter-section {
+      padding: 10px 16px 0;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .filter-row {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      padding: 10px 16px 12px;
+      margin-bottom: 10px;
     }
 
-    .team-btn {
+    .filter-btn {
       border: 1px solid #334155;
       border-radius: 20px;
       padding: 4px 14px;
@@ -76,14 +90,23 @@
       font-size: 13px;
       cursor: pointer;
       transition: all 0.15s;
+      height: 28px;
+      display: flex;
+      align-items: center;
     }
-    .team-btn:hover { border-color: #64748b; }
-    .team-btn.active {
+    .filter-btn:hover { border-color: #64748b; }
+    .filter-btn.active {
       border-color: transparent;
       color: #0f172a;
       font-weight: 700;
     }
 
+    /* Role filter colors */
+    .role-btn-ref.active   { background: #fb923c; }
+    .role-btn-srv.active   { background: #a78bfa; }
+    .role-btn-all.active   { background: #3b82f6; color: #fff; }
+
+    /* ── Match cards ── */
     .matches {
       padding: 0 16px;
       display: flex;
@@ -111,9 +134,13 @@
       font-weight: 700;
     }
 
-    .match-field {
-      color: #475569;
-      font-size: 12px;
+    /* Kontrastní odznak kurtu */
+    .match-field-badge {
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
     }
 
     .match-vs {
@@ -146,6 +173,11 @@
       color: #cbd5e1;
       font-size: 13px;
       line-height: 1.6;
+    }
+
+    /* Dimmed cards when role filter hides primary content */
+    .match-card.dimmed {
+      opacity: 0.35;
     }
 
     .highlight {
@@ -196,7 +228,21 @@
   <input class="search-input" id="search" type="search" placeholder="Hledat podle jména nebo času…" oninput="render()">
 </div>
 
-<div class="team-filters" id="team-filters"></div>
+<!-- Filtr týmu -->
+<div class="filter-section">
+  <div class="filter-label">Tým</div>
+  <div class="filter-row" id="team-filters"></div>
+</div>
+
+<!-- Filtr funkce -->
+<div class="filter-section">
+  <div class="filter-label">Funkce</div>
+  <div class="filter-row" id="role-filters">
+    <button class="filter-btn role-btn-all active" onclick="setRole(null, this)">Vše</button>
+    <button class="filter-btn role-btn-ref" onclick="setRole('ref', this)">🟠 Rozhodčí</button>
+    <button class="filter-btn role-btn-srv" onclick="setRole('srv', this)">🟣 Podávající</button>
+  </div>
+</div>
 
 <div class="matches" id="matches">
   <div class="loading">Načítám rozvrh…</div>
@@ -205,17 +251,40 @@
 <div class="updated" id="updated"></div>
 
 <script>
+  // ── Barvy týmů ──────────────────────────────────────────────────────────
   const TEAM_COLORS = {
     "Mix A": "#4ade80",
     "Mix B": "#60a5fa",
-    "Muži": "#f97316",
-    "Ženy": "#e879f9",
+    "Muži":  "#f97316",
+    "Ženy":  "#e879f9",
   };
 
+  // ── Kontrastní barvy kurtů ───────────────────────────────────────────────
+  const FIELD_COLORS = {
+    "1": { bg: "#fbbf24", text: "#0f172a" },
+    "2": { bg: "#38bdf8", text: "#0f172a" },
+    "3": { bg: "#a78bfa", text: "#0f172a" },
+    "4": { bg: "#fb923c", text: "#0f172a" },
+    "5": { bg: "#34d399", text: "#0f172a" },
+    "6": { bg: "#f472b6", text: "#0f172a" },
+  };
+
+  function fieldBadge(field) {
+    if (!field) return "";
+    // Extrahuj číslo z názvu kurtu (např. "Kurt 2" → "2", "Field 3" → "3")
+    const match = String(field).match(/\d+/);
+    const num = match ? match[0] : null;
+    const colors = num && FIELD_COLORS[num] ? FIELD_COLORS[num] : { bg: "#334155", text: "#94a3b8" };
+    return `<span class="match-field-badge" style="background:${colors.bg};color:${colors.text}">Kurt ${num || field}</span>`;
+  }
+
+  // ── Stav ────────────────────────────────────────────────────────────────
   let allMatches = [];
   let activeTeam = null;
+  let activeRole = null;  // null | "ref" | "srv"
   let lastFetch = null;
 
+  // ── Helpers ─────────────────────────────────────────────────────────────
   function teamColor(name) {
     for (const [key, color] of Object.entries(TEAM_COLORS)) {
       if (name && name.includes(key)) return color;
@@ -237,6 +306,17 @@
     return escaped.replace(new RegExp(escapedQ, 'gi'), m => `<span class="highlight">${m}</span>`);
   }
 
+  // ── Filtr funkce ─────────────────────────────────────────────────────────
+  function setRole(role, btn) {
+    activeRole = role;
+    document.querySelectorAll("#role-filters .filter-btn").forEach(b => {
+      b.classList.remove("active");
+    });
+    btn.classList.add("active");
+    render();
+  }
+
+  // ── Filtr týmu ───────────────────────────────────────────────────────────
   function buildTeamFilters() {
     const teams = new Set();
     for (const m of allMatches) {
@@ -252,15 +332,15 @@
     container.innerHTML = "";
 
     const allBtn = document.createElement("button");
-    allBtn.className = "team-btn" + (activeTeam === null ? " active" : "");
+    allBtn.className = "filter-btn" + (activeTeam === null ? " active" : "");
     allBtn.textContent = "Vše";
-    if (activeTeam === null) allBtn.style.background = "#3b82f6";
+    if (activeTeam === null) { allBtn.style.background = "#3b82f6"; allBtn.style.color = "#fff"; }
     allBtn.onclick = () => { activeTeam = null; buildTeamFilters(); render(); };
     container.appendChild(allBtn);
 
     for (const team of active) {
       const btn = document.createElement("button");
-      btn.className = "team-btn" + (activeTeam === team ? " active" : "");
+      btn.className = "filter-btn" + (activeTeam === team ? " active" : "");
       btn.textContent = team;
       if (activeTeam === team) btn.style.background = TEAM_COLORS[team];
       btn.onclick = () => { activeTeam = team; buildTeamFilters(); render(); };
@@ -268,6 +348,7 @@
     }
   }
 
+  // ── Render ───────────────────────────────────────────────────────────────
   function render() {
     const query = document.getElementById("search").value.trim().toLowerCase();
     const container = document.getElementById("matches");
@@ -283,12 +364,14 @@
 
     let filtered = allMatches;
 
+    // Filtr týmu
     if (activeTeam) {
       filtered = filtered.filter(m =>
         [m.home, m.away, m.ref_team, m.serving_team].some(t => t && t.includes(activeTeam))
       );
     }
 
+    // Filtr textu
     if (query) {
       filtered = filtered.filter(m =>
         m.st.includes(query) ||
@@ -308,6 +391,11 @@
       const refColor = teamColor(m.ref_team);
       const srvColor = teamColor(m.serving_team);
 
+      // Dimming podle role filtru
+      let dimmed = "";
+      if (activeRole === "ref" && (!m.referees || m.referees.length === 0)) dimmed = " dimmed";
+      if (activeRole === "srv" && (!m.servers || m.servers.length === 0)) dimmed = " dimmed";
+
       const refRow = m.referees && m.referees.length ? `
         <div class="duty-row">
           <span class="duty-badge" style="background:${refColor}">Rozhodčí</span>
@@ -321,10 +409,10 @@
         </div>` : "";
 
       return `
-        <div class="match-card">
+        <div class="match-card${dimmed}">
           <div class="match-head">
             <span class="match-time">${escapeHtml(m.st)}</span>
-            <span class="match-field">${escapeHtml(m.field || "")}</span>
+            ${fieldBadge(m.field)}
             <span class="match-vs">${highlight(m.home, query)} vs ${highlight(m.away, query)}</span>
           </div>
           ${refRow}${srvRow}
@@ -332,6 +420,7 @@
     }).join("");
   }
 
+  // ── Fetch ────────────────────────────────────────────────────────────────
   async function fetchSchedule() {
     try {
       const res = await fetch("/api/assignments");
@@ -355,7 +444,6 @@
     }
   }
 
-  // Načti hned a pak každých 30 sekund
   fetchSchedule();
   setInterval(fetchSchedule, 30000);
 </script>
