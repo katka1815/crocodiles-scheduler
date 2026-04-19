@@ -305,6 +305,7 @@ def tournify_to_sg(team_name):
 
 
 def assign_duties(matches, subgroups, preferences=None, vocas=None):
+    import unicodedata
     if preferences is None:
         preferences = {}
     if vocas is None:
@@ -312,15 +313,34 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
 
     def sg_key(name):
         mapping = {
-            "Muži": "Muži", "Muzi": "Muži",
-            "Ženy": "Ženy", "Zeny": "Ženy",
+            "Muzi": "Muzi", "Muzi": "Muzi",
+            "Zeny": "Zeny", "Zeny": "Zeny",
             "Mix A": "Mix A", "Mix B": "Mix B",
         }
         return mapping.get(name, name)
 
+    def norm(s):
+        return " ".join(unicodedata.normalize("NFC", s).strip().split()).lower()
+
     norm_sg = {sg_key(k): v for k, v in subgroups.items()}
-    all_members = {m: {"duties": 0, "busy_times": set()}
-                   for ms in subgroups.values() for m in ms}
+    vocas_norm = {norm(v) for v in vocas}
+
+    # all_members zahrnuje VSECHNY hrace ze vsech tymu
+    all_members = {}
+    for team_members in MEMBERS_BY_TEAM.values():
+        for m in team_members:
+            if m not in all_members:
+                all_members[m] = {"duties": 0, "busy_times": set()}
+    for team_members in subgroups.values():
+        for m in team_members:
+            if m not in all_members:
+                all_members[m] = {"duties": 0, "busy_times": set()}
+
+    def get_team_pool(sg_name):
+        key = sg_key(sg_name) if sg_name else None
+        if not key:
+            return []
+        return list(norm_sg.get(key) or MEMBERS_BY_TEAM.get(key, []))
 
     result = []
     for match in matches:
@@ -329,27 +349,27 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
         away_sg = tournify_to_sg(match["away"])
         playing_sgs = {sg_key(sg) for sg in [home_sg, away_sg] if sg}
 
+        # Oznac hrace hrajicich tymu jako busy
         for sg in playing_sgs:
-            if sg in norm_sg:
-                for m in norm_sg[sg]:
+            for m in get_team_pool(sg):
+                if m in all_members:
                     all_members[m]["busy_times"].add(time_key)
 
         ref_tournify = match.get("ref_team", "")
         ref_sg = tournify_to_sg(ref_tournify) if ref_tournify else None
         whistle_sg = sg_key(ref_sg) if ref_sg else None
 
-        def pick_n(sg_name, n, exclude=None, prefer_role=None):
-            key = sg_key(sg_name) if sg_name else None
-            if not key or key not in norm_sg:
-                return []
-            pool = [m for m in norm_sg[key]
-                    if time_key not in all_members[m]["busy_times"]
-                    and m not in (exclude or set())]
+        ref_is_crocodiles = bool(whistle_sg and whistle_sg not in playing_sgs and get_team_pool(whistle_sg))
+        playing_is_crocodiles = len(playing_sgs) > 0
 
-            import unicodedata
-            def norm(s):
-                return " ".join(unicodedata.normalize("NFC", s).strip().split()).lower()
-            vocas_norm = {norm(v) for v in vocas}
+        if not playing_is_crocodiles and not ref_is_crocodiles:
+            continue
+
+        def pick_n(team_pool, n, exclude=None, prefer_role=None):
+            exclude = exclude or set()
+            pool = [m for m in team_pool
+                    if time_key not in all_members[m]["busy_times"]
+                    and m not in exclude]
 
             def sort_key(m):
                 is_vocas = norm(m) in vocas_norm
@@ -372,15 +392,10 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
                 all_members[m]["busy_times"].add(time_key)
             return chosen
 
-        ref_is_crocodiles = whistle_sg and whistle_sg in norm_sg and whistle_sg not in playing_sgs
-        playing_is_crocodiles = len(playing_sgs) > 0
-
-        if not playing_is_crocodiles and not ref_is_crocodiles:
-            continue
-
         referees = []
         if ref_is_crocodiles:
-            referees = pick_n(whistle_sg, 4, prefer_role="ref")
+            ref_pool = get_team_pool(whistle_sg)
+            referees = pick_n(ref_pool, 4, prefer_role="ref")
 
         serving_sg = None
         for sg in [home_sg, away_sg]:
@@ -393,7 +408,8 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
         servers = []
         if serving_sg:
             already = set(referees)
-            servers = pick_n(serving_sg, 3, exclude=already, prefer_role="server")
+            server_pool = get_team_pool(serving_sg)
+            servers = pick_n(server_pool, 3, exclude=already, prefer_role="server")
 
         result.append({**match,
             "ref_team": whistle_sg or ref_tournify or "-",
