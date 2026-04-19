@@ -18,34 +18,38 @@
     header {
       background: #1e293b;
       border-bottom: 1px solid #334155;
-      padding: 16px;
+      padding: 16px 16px 0;
       position: sticky;
       top: 0;
       z-index: 10;
     }
 
-    .header-title {
-      font-size: 18px;
-      font-weight: 800;
-      color: #f1f5f9;
-    }
+    .header-title { font-size: 18px; font-weight: 800; color: #f1f5f9; }
+    .header-sub   { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .header-day   { font-size: 13px; color: #60a5fa; margin-top: 4px; font-weight: 600; }
 
-    .header-sub {
-      font-size: 12px;
+    /* ── Tabs ── */
+    .tabs { display: flex; margin-top: 12px; }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 0;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
       color: #64748b;
-      margin-top: 2px;
-    }
-
-    .header-day {
-      font-size: 13px;
-      color: #60a5fa;
-      margin-top: 4px;
+      font-size: 14px;
       font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
     }
+    .tab-btn.active { color: #f1f5f9; border-bottom-color: #3b82f6; }
 
-    .controls {
-      padding: 12px 16px 0;
-    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Controls ── */
+    .controls { padding: 12px 16px 0; }
 
     .search-input {
       width: 100%;
@@ -60,10 +64,8 @@
     .search-input::placeholder { color: #475569; }
     .search-input:focus { border-color: #3b82f6; }
 
-    /* ── Filter rows ── */
-    .filter-section {
-      padding: 10px 16px 0;
-    }
+    /* ── Filters ── */
+    .filter-section { padding: 10px 16px 0; }
 
     .filter-label {
       font-size: 11px;
@@ -95,16 +97,10 @@
       align-items: center;
     }
     .filter-btn:hover { border-color: #64748b; }
-    .filter-btn.active {
-      border-color: transparent;
-      color: #0f172a;
-      font-weight: 700;
-    }
-
-    /* Role filter colors */
-    .role-btn-ref.active   { background: #fb923c; }
-    .role-btn-srv.active   { background: #a78bfa; }
-    .role-btn-all.active   { background: #3b82f6; color: #fff; }
+    .filter-btn.active { border-color: transparent; color: #0f172a; font-weight: 700; }
+    .role-btn-ref.active { background: #fb923c; }
+    .role-btn-srv.active { background: #a78bfa; }
+    .role-btn-all.active { background: #3b82f6; color: #fff !important; }
 
     /* ── Match cards ── */
     .matches {
@@ -119,6 +115,7 @@
       border-radius: 12px;
       padding: 12px;
     }
+    .match-card.dimmed { opacity: 0.35; }
 
     .match-head {
       display: flex;
@@ -128,13 +125,8 @@
       margin-bottom: 8px;
     }
 
-    .match-time {
-      color: #94a3b8;
-      font-size: 13px;
-      font-weight: 700;
-    }
+    .match-time   { color: #94a3b8; font-size: 13px; font-weight: 700; }
 
-    /* Kontrastní odznak kurtu */
     .match-field-badge {
       border-radius: 4px;
       padding: 2px 8px;
@@ -169,51 +161,85 @@
       text-align: center;
     }
 
-    .duty-names {
-      color: #cbd5e1;
-      font-size: 13px;
-      line-height: 1.6;
+    .duty-names { color: #cbd5e1; font-size: 13px; line-height: 1.6; }
+
+    /* ── Player cards ── */
+    .players-list {
+      padding: 12px 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
-    /* Dimmed cards when role filter hides primary content */
-    .match-card.dimmed {
-      opacity: 0.35;
+    .player-card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 12px;
     }
 
-    .highlight {
-      background: #fde047;
+    .player-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .player-team-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .player-slots { display: flex; flex-direction: column; gap: 5px; }
+
+    .player-slot-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .player-slot-time {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 700;
+      width: 48px;
+      flex-shrink: 0;
+    }
+
+    .player-slot-role {
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 800;
       color: #0f172a;
-      border-radius: 3px;
-      padding: 0 2px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
-    .empty {
-      color: #64748b;
-      text-align: center;
-      padding: 40px 16px;
-      font-size: 15px;
+    .player-slot-detail {
+      color: #94a3b8;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .loading {
-      color: #64748b;
-      text-align: center;
-      padding: 60px 16px;
-      font-size: 15px;
-    }
+    .player-search { padding: 12px 16px 0; }
 
-    .no-schedule {
-      text-align: center;
-      padding: 60px 16px;
-    }
+    /* ── Shared ── */
+    .highlight { background: #fde047; color: #0f172a; border-radius: 3px; padding: 0 2px; }
+    .empty    { color: #64748b; text-align: center; padding: 40px 16px; font-size: 15px; }
+    .loading  { color: #64748b; text-align: center; padding: 60px 16px; font-size: 15px; }
+
+    .no-schedule { text-align: center; padding: 60px 16px; }
     .no-schedule .emoji { font-size: 48px; margin-bottom: 16px; }
     .no-schedule p { color: #64748b; font-size: 15px; }
 
-    .updated {
-      text-align: center;
-      color: #334155;
-      font-size: 11px;
-      padding: 16px;
-    }
+    .updated { text-align: center; color: #334155; font-size: 11px; padding: 16px; }
   </style>
 </head>
 <body>
@@ -222,36 +248,51 @@
   <div class="header-title">🐊 Prague Crocodiles</div>
   <div class="header-sub">Rozvrh služeb</div>
   <div class="header-day" id="schedule-day"></div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('schedule', this)">📋 Rozvrh</button>
+    <button class="tab-btn" onclick="switchTab('players', this)">👥 Hráči</button>
+  </div>
 </header>
 
-<div class="controls">
-  <input class="search-input" id="search" type="search" placeholder="Hledat podle jména nebo času…" oninput="render()">
+<!-- ══ TAB: ROZVRH ══════════════════════════════════════════════════════ -->
+<div class="tab-pane active" id="tab-schedule">
+
+  <div class="controls">
+    <input class="search-input" id="search" type="search" placeholder="Hledat podle jména nebo času…" oninput="render()">
+  </div>
+
+  <div class="filter-section">
+    <div class="filter-label">Tým</div>
+    <div class="filter-row" id="team-filters"></div>
+  </div>
+
+  <div class="filter-section">
+    <div class="filter-label">Funkce</div>
+    <div class="filter-row" id="role-filters">
+      <button class="filter-btn role-btn-all active" onclick="setRole(null, this)">Vše</button>
+      <button class="filter-btn role-btn-ref" onclick="setRole('ref', this)">🟠 Rozhodčí</button>
+      <button class="filter-btn role-btn-srv" onclick="setRole('srv', this)">🟣 Podávající</button>
+    </div>
+  </div>
+
+  <div class="matches" id="matches">
+    <div class="loading">Načítám rozvrh…</div>
+  </div>
+
+  <div class="updated" id="updated"></div>
 </div>
 
-<!-- Filtr týmu -->
-<div class="filter-section">
-  <div class="filter-label">Tým</div>
-  <div class="filter-row" id="team-filters"></div>
-</div>
-
-<!-- Filtr funkce -->
-<div class="filter-section">
-  <div class="filter-label">Funkce</div>
-  <div class="filter-row" id="role-filters">
-    <button class="filter-btn role-btn-all active" onclick="setRole(null, this)">Vše</button>
-    <button class="filter-btn role-btn-ref" onclick="setRole('ref', this)">🟠 Rozhodčí</button>
-    <button class="filter-btn role-btn-srv" onclick="setRole('srv', this)">🟣 Podávající</button>
+<!-- ══ TAB: HRÁČI ═══════════════════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-players">
+  <div class="player-search">
+    <input class="search-input" id="player-search" type="search" placeholder="Hledat hráče…" oninput="renderPlayers()">
+  </div>
+  <div class="players-list" id="players-list">
+    <div class="loading">Načítám…</div>
   </div>
 </div>
 
-<div class="matches" id="matches">
-  <div class="loading">Načítám rozvrh…</div>
-</div>
-
-<div class="updated" id="updated"></div>
-
 <script>
-  // ── Barvy týmů ──────────────────────────────────────────────────────────
   const TEAM_COLORS = {
     "Mix A": "#4ade80",
     "Mix B": "#60a5fa",
@@ -259,7 +300,12 @@
     "Ženy":  "#e879f9",
   };
 
-  // ── Kontrastní barvy kurtů ───────────────────────────────────────────────
+  const ROLE_META = {
+    ref:  { bg: "#fb923c", label: "Rozhodčí" },
+    srv:  { bg: "#a78bfa", label: "Podávající" },
+    play: { bg: "#4ade80", label: "Hraje" },
+  };
+
   const FIELD_COLORS = {
     "1": { bg: "#fbbf24", text: "#0f172a" },
     "2": { bg: "#38bdf8", text: "#0f172a" },
@@ -269,20 +315,10 @@
     "6": { bg: "#f472b6", text: "#0f172a" },
   };
 
-  function fieldBadge(field) {
-    if (!field) return "";
-    // Extrahuj číslo z názvu kurtu (např. "Kurt 2" → "2", "Field 3" → "3")
-    const match = String(field).match(/\d+/);
-    const num = match ? match[0] : null;
-    const colors = num && FIELD_COLORS[num] ? FIELD_COLORS[num] : { bg: "#334155", text: "#94a3b8" };
-    return `<span class="match-field-badge" style="background:${colors.bg};color:${colors.text}">Kurt ${num || field}</span>`;
-  }
-
-  // ── Stav ────────────────────────────────────────────────────────────────
   let allMatches = [];
   let activeTeam = null;
-  let activeRole = null;  // null | "ref" | "srv"
-  let lastFetch = null;
+  let activeRole = null;
+  let activeTab  = "schedule";
 
   // ── Helpers ─────────────────────────────────────────────────────────────
   function teamColor(name) {
@@ -294,24 +330,38 @@
 
   function escapeHtml(str) {
     return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
   function highlight(text, query) {
     if (!query) return escapeHtml(text);
-    const escaped = escapeHtml(text);
-    const escapedQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return escaped.replace(new RegExp(escapedQ, 'gi'), m => `<span class="highlight">${m}</span>`);
+    const esc = escapeHtml(text);
+    const q   = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return esc.replace(new RegExp(q, 'gi'), m => `<span class="highlight">${m}</span>`);
+  }
+
+  function fieldBadge(field) {
+    if (!field) return "";
+    const m = String(field).match(/\d+/);
+    const n = m ? m[0] : null;
+    const c = n && FIELD_COLORS[n] ? FIELD_COLORS[n] : { bg: "#334155", text: "#94a3b8" };
+    return `<span class="match-field-badge" style="background:${c.bg};color:${c.text}">Kurt ${n || field}</span>`;
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+  function switchTab(tab, btn) {
+    activeTab = tab;
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + tab).classList.add("active");
+    if (tab === "players") renderPlayers();
   }
 
   // ── Filtr funkce ─────────────────────────────────────────────────────────
   function setRole(role, btn) {
     activeRole = role;
-    document.querySelectorAll("#role-filters .filter-btn").forEach(b => {
-      b.classList.remove("active");
-    });
+    document.querySelectorAll("#role-filters .filter-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     render();
   }
@@ -326,17 +376,17 @@
         }
       }
     }
-    const order = ["Mix A", "Mix B", "Muži", "Ženy"];
+    const order  = ["Mix A", "Mix B", "Muži", "Ženy"];
     const active = order.filter(k => teams.has(k));
-    const container = document.getElementById("team-filters");
-    container.innerHTML = "";
+    const cont   = document.getElementById("team-filters");
+    cont.innerHTML = "";
 
     const allBtn = document.createElement("button");
     allBtn.className = "filter-btn" + (activeTeam === null ? " active" : "");
     allBtn.textContent = "Vše";
     if (activeTeam === null) { allBtn.style.background = "#3b82f6"; allBtn.style.color = "#fff"; }
     allBtn.onclick = () => { activeTeam = null; buildTeamFilters(); render(); };
-    container.appendChild(allBtn);
+    cont.appendChild(allBtn);
 
     for (const team of active) {
       const btn = document.createElement("button");
@@ -344,57 +394,50 @@
       btn.textContent = team;
       if (activeTeam === team) btn.style.background = TEAM_COLORS[team];
       btn.onclick = () => { activeTeam = team; buildTeamFilters(); render(); };
-      container.appendChild(btn);
+      cont.appendChild(btn);
     }
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render rozvrhu ───────────────────────────────────────────────────────
   function render() {
     const query = document.getElementById("search").value.trim().toLowerCase();
-    const container = document.getElementById("matches");
+    const cont  = document.getElementById("matches");
 
     if (allMatches.length === 0) {
-      container.innerHTML = `
-        <div class="no-schedule">
-          <div class="emoji">📋</div>
-          <p>Rozvrh ještě nebyl vygenerován.<br>Počkej až ho Kateřina připraví 🐊</p>
-        </div>`;
+      cont.innerHTML = `<div class="no-schedule"><div class="emoji">📋</div><p>Rozvrh ještě nebyl vygenerován.<br>Počkej až ho Kateřina připraví 🐊</p></div>`;
       return;
     }
 
     let filtered = allMatches;
 
-    // Filtr týmu
     if (activeTeam) {
       filtered = filtered.filter(m =>
         [m.home, m.away, m.ref_team, m.serving_team].some(t => t && t.includes(activeTeam))
       );
     }
 
-    // Filtr textu
     if (query) {
       filtered = filtered.filter(m =>
         m.st.includes(query) ||
         (m.home || "").toLowerCase().includes(query) ||
         (m.away || "").toLowerCase().includes(query) ||
         (m.referees || []).some(r => r.toLowerCase().includes(query)) ||
-        (m.servers || []).some(s => s.toLowerCase().includes(query))
+        (m.servers  || []).some(s => s.toLowerCase().includes(query))
       );
     }
 
     if (filtered.length === 0) {
-      container.innerHTML = `<div class="empty">Žádné zápasy neodpovídají filtru.</div>`;
+      cont.innerHTML = `<div class="empty">Žádné zápasy neodpovídají filtru.</div>`;
       return;
     }
 
-    container.innerHTML = filtered.map(m => {
+    cont.innerHTML = filtered.map(m => {
       const refColor = teamColor(m.ref_team);
       const srvColor = teamColor(m.serving_team);
 
-      // Dimming podle role filtru
       let dimmed = "";
-      if (activeRole === "ref" && (!m.referees || m.referees.length === 0)) dimmed = " dimmed";
-      if (activeRole === "srv" && (!m.servers || m.servers.length === 0)) dimmed = " dimmed";
+      if (activeRole === "ref" && (!m.referees || !m.referees.length)) dimmed = " dimmed";
+      if (activeRole === "srv" && (!m.servers  || !m.servers.length))  dimmed = " dimmed";
 
       const refRow = m.referees && m.referees.length ? `
         <div class="duty-row">
@@ -420,24 +463,111 @@
     }).join("");
   }
 
+  // ── Přehled hráčů ────────────────────────────────────────────────────────
+  function buildPlayerMap() {
+    const players = {};
+
+    function ensure(name) {
+      if (!players[name]) players[name] = { teams: new Set(), slots: [] };
+    }
+
+    for (const m of allMatches) {
+      const time    = m.st || "";
+      const fieldTxt = m.field ? ` · Kurt ${String(m.field).replace(/\D/g,"") || m.field}` : "";
+      const matchLabel = `${m.home || ""} vs ${m.away || ""}${fieldTxt}`;
+
+      // Hrající (pole playing, pokud existuje)
+      for (const name of (m.playing || [])) {
+        ensure(name);
+        for (const [k, v] of Object.entries(TEAM_COLORS)) {
+          if ((m.home || "").includes(k) || (m.away || "").includes(k)) players[name].teams.add(v);
+        }
+        players[name].slots.push({ time, role: "play", detail: matchLabel });
+      }
+
+      // Rozhodčí
+      for (const name of (m.referees || [])) {
+        ensure(name);
+        for (const [k, v] of Object.entries(TEAM_COLORS)) {
+          if ((m.ref_team || "").includes(k)) players[name].teams.add(v);
+        }
+        players[name].slots.push({ time, role: "ref", detail: matchLabel });
+      }
+
+      // Podávající
+      for (const name of (m.servers || [])) {
+        ensure(name);
+        for (const [k, v] of Object.entries(TEAM_COLORS)) {
+          if ((m.serving_team || "").includes(k)) players[name].teams.add(v);
+        }
+        players[name].slots.push({ time, role: "srv", detail: matchLabel });
+      }
+    }
+
+    return players;
+  }
+
+  function renderPlayers() {
+    const query = document.getElementById("player-search").value.trim().toLowerCase();
+    const cont  = document.getElementById("players-list");
+
+    if (allMatches.length === 0) {
+      cont.innerHTML = `<div class="no-schedule"><div class="emoji">👥</div><p>Rozvrh ještě nebyl vygenerován.<br>Počkej až ho Kateřina připraví 🐊</p></div>`;
+      return;
+    }
+
+    const map   = buildPlayerMap();
+    let names   = Object.keys(map).sort((a, b) => a.localeCompare(b, "cs"));
+
+    if (query) names = names.filter(n => n.toLowerCase().includes(query));
+
+    if (names.length === 0) {
+      cont.innerHTML = `<div class="empty">Žádný hráč neodpovídá hledání.</div>`;
+      return;
+    }
+
+    cont.innerHTML = names.map(name => {
+      const p        = map[name];
+      const teamArr  = [...p.teams];
+      const dotColor = teamArr.length ? (TEAM_COLORS[teamArr[0]] || "#94a3b8") : "#94a3b8";
+      const teamLabel = teamArr.join(", ");
+
+      const slotsHtml = p.slots.map(s => {
+        const rc = ROLE_META[s.role] || { bg: "#94a3b8", label: s.role };
+        return `
+          <div class="player-slot-row">
+            <span class="player-slot-time">${escapeHtml(s.time)}</span>
+            <span class="player-slot-role" style="background:${rc.bg}">${rc.label}</span>
+            <span class="player-slot-detail">${escapeHtml(s.detail)}</span>
+          </div>`;
+      }).join("") || `<span style="color:#475569;font-size:13px">Žádná přiřazená funkce</span>`;
+
+      return `
+        <div class="player-card">
+          <div class="player-name">
+            <span class="player-team-dot" style="background:${dotColor}"></span>
+            ${highlight(name, query)}
+            ${teamLabel ? `<span style="font-size:12px;color:#64748b;font-weight:400">${escapeHtml(teamLabel)}</span>` : ""}
+          </div>
+          <div class="player-slots">${slotsHtml}</div>
+        </div>`;
+    }).join("");
+  }
+
   // ── Fetch ────────────────────────────────────────────────────────────────
   async function fetchSchedule() {
     try {
-      const res = await fetch("/api/assignments");
+      const res  = await fetch("/api/assignments");
       const data = await res.json();
       allMatches = data.assignments || [];
-      lastFetch = new Date();
 
-      const dayEl = document.getElementById("schedule-day");
-      dayEl.textContent = data.schedule_label || "";
-
-      const updEl = document.getElementById("updated");
-      updEl.textContent = allMatches.length
-        ? `Aktualizováno: ${lastFetch.toLocaleTimeString("cs-CZ")}`
-        : "";
+      document.getElementById("schedule-day").textContent = data.schedule_label || "";
+      document.getElementById("updated").textContent = allMatches.length
+        ? `Aktualizováno: ${new Date().toLocaleTimeString("cs-CZ")}` : "";
 
       buildTeamFilters();
       render();
+      if (activeTab === "players") renderPlayers();
     } catch (e) {
       document.getElementById("matches").innerHTML =
         `<div class="empty">Nepodařilo se načíst rozvrh. Zkus to za chvíli.</div>`;
