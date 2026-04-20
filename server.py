@@ -42,6 +42,7 @@ MEMBERS_BY_TEAM = {
 
 STATE = {
     "members": {k: list(v) for k, v in MEMBERS_BY_TEAM.items()},
+    "custom_teams": {k: list(v) for k, v in MEMBERS_BY_TEAM.items()},
     "attending": None,
     "matches": [],
     "day_timestamps": [],
@@ -411,12 +412,17 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
             server_pool = get_team_pool(serving_sg)
             servers = pick_n(server_pool, 3, exclude=already, prefer_role="server")
 
+        playing_players = []
+        for sg in playing_sgs:
+            playing_players.extend(get_team_pool(sg))
+
         result.append({**match,
             "ref_team": whistle_sg or ref_tournify or "-",
             "serving_team": serving_sg or "-",
             "referees": referees,
             "servers": servers,
             "playing": list(playing_sgs),
+            "playing_players": playing_players,
         })
     return result
 
@@ -527,6 +533,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, **result})
             except Exception as e:
                 self.send_json({"error": str(e)}, 400)
+
+        elif path == "/api/set_teams":
+            teams = data.get("teams", {})
+            if teams and isinstance(teams, dict):
+                STATE["custom_teams"] = teams
+                # Aktualizuj MEMBERS_BY_TEAM globálně aby get_team_pool fungovalo
+                MEMBERS_BY_TEAM.update(teams)
+            self.send_json({"ok": True, "teams": {k: len(v) for k, v in STATE["custom_teams"].items()}})
 
         elif path == "/api/set_vocas":
             STATE["vocas"] = data.get("vocas", [])

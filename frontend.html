@@ -422,7 +422,8 @@
         (m.home || "").toLowerCase().includes(query) ||
         (m.away || "").toLowerCase().includes(query) ||
         (m.referees || []).some(r => r.toLowerCase().includes(query)) ||
-        (m.servers  || []).some(s => s.toLowerCase().includes(query))
+        (m.servers  || []).some(s => s.toLowerCase().includes(query)) ||
+        (m.playing_players || []).some(p => p.toLowerCase().includes(query))
       );
     }
 
@@ -476,11 +477,11 @@
       const fieldTxt = m.field ? ` · Kurt ${String(m.field).replace(/\D/g,"") || m.field}` : "";
       const matchLabel = `${m.home || ""} vs ${m.away || ""}${fieldTxt}`;
 
-      // Hrající (pole playing, pokud existuje)
-      for (const name of (m.playing || [])) {
+      // Hrající (playing_players = jména hráčů z appky)
+      for (const name of (m.playing_players || [])) {
         ensure(name);
-        for (const [k, v] of Object.entries(TEAM_COLORS)) {
-          if ((m.home || "").includes(k) || (m.away || "").includes(k)) players[name].teams.add(v);
+        for (const sg of (m.playing || [])) {
+          if (TEAM_COLORS[sg]) players[name].teams.add(sg);
         }
         players[name].slots.push({ time, role: "play", detail: matchLabel });
       }
@@ -531,6 +532,7 @@
       const teamArr  = [...p.teams];
       const dotColor = teamArr.length ? (TEAM_COLORS[teamArr[0]] || "#94a3b8") : "#94a3b8";
       const teamLabel = teamArr.join(", ");
+      // teamArr obsahuje klíče jako "Mix A", "Mix B" atd.
 
       const slotsHtml = p.slots.map(s => {
         const rc = ROLE_META[s.role] || { bg: "#94a3b8", label: s.role };
