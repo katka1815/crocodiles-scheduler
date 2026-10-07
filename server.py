@@ -207,6 +207,23 @@ async def _spond_events(day_timestamps):
         await s.clientsession.close()
 
 
+async def _spond_members():
+    """Vsichni clenove Spond skupiny - aby appka nabidla i nove hrace."""
+    import unicodedata
+    s = spond_lib.Spond(username=SPOND_USERNAME, password=SPOND_PASSWORD)
+    try:
+        group = await s.get_group(SPOND_GROUP_ID)
+        names = set()
+        for m in group.get("members", []):
+            name = unicodedata.normalize("NFC", f"{m.get('firstName', '')} {m.get('lastName', '')}".strip())
+            name = " ".join(name.split())
+            if name:
+                names.add(name)
+        return sorted(names)
+    finally:
+        await s.clientsession.close()
+
+
 async def _spond_attendance(event_id):
     s = spond_lib.Spond(username=SPOND_USERNAME, password=SPOND_PASSWORD)
     try:
@@ -343,18 +360,25 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
             return []
         return list(norm_sg.get(key) or MEMBERS_BY_TEAM.get(key, []))
 
+    def match_time(match):
+        return match.get("time") or match.get("st") or str(match["slot"])
+
+    # Hrajici jsou busy predem ve vsech zapasech - i na jinem kurtu ve stejny cas
+    playing_times = {m: set() for m in all_members}
+    for match in matches:
+        for sg in [tournify_to_sg(match["home"]), tournify_to_sg(match["away"])]:
+            if sg:
+                for m in get_team_pool(sg_key(sg)):
+                    if m in all_members:
+                        playing_times[m].add(match_time(match))
+                        all_members[m]["busy_times"].add(match_time(match))
+
     result = []
     for match in matches:
-        time_key = match.get("time") or match.get("st") or str(match["slot"])
+        time_key = match_time(match)
         home_sg = tournify_to_sg(match["home"])
         away_sg = tournify_to_sg(match["away"])
         playing_sgs = {sg_key(sg) for sg in [home_sg, away_sg] if sg}
-
-        # Oznac hrace hrajicich tymu jako busy
-        for sg in playing_sgs:
-            for m in get_team_pool(sg):
-                if m in all_members:
-                    all_members[m]["busy_times"].add(time_key)
 
         ref_tournify = match.get("ref_team", "")
         ref_sg = tournify_to_sg(ref_tournify) if ref_tournify else None
@@ -394,6 +418,7 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
             return chosen
 
         referees = []
+        ref_pool = []
         if ref_is_crocodiles:
             ref_pool = get_team_pool(whistle_sg)
             referees = pick_n(ref_pool, 4, prefer_role="ref")
@@ -407,6 +432,7 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
                     break
 
         servers = []
+        server_pool = []
         if serving_sg:
             already = set(referees)
             server_pool = get_team_pool(serving_sg)
@@ -423,7 +449,110 @@ def assign_duties(matches, subgroups, preferences=None, vocas=None):
             "servers": servers,
             "playing": list(playing_sgs),
             "playing_players": playing_players,
+            "_time": time_key,
+            "_pools": {"referees": ref_pool, "servers": server_pool},
         })
+
+    # ── Dorovnani: greedy vyse je kratkozrake, tady se sluzby presouvaji ──
+    ROLE_OF = {"referees": "ref", "servers": "server"}
+
+    def count(m):
+        return all_members[m]["duties"]
+
+    def holders():
+        """Vsechny obsazene sluzby jako (zapas, klic seznamu, pozice, jmeno)."""
+        return [(e, k, i, m) for e in result for k in ROLE_OF for i, m in enumerate(e[k])]
+
+    def duty_times(m, skip=None):
+        return {e["_time"] for e, k, i, h in holders() if h == m and (e, k, i) != skip}
+
+    def eligible(m, e, k, giving_up=None):
+        """Muze m vzit sluzbu k v zapase e? giving_up = sluzba, kterou m zaroven pousti."""
+        if m not in e["_pools"][k] or m not in all_members:
+            return False
+        if e["_time"] in playing_times[m]:
+            return False
+        return e["_time"] not in duty_times(m, skip=giving_up)
+
+    def give(e, k, i, new):
+        old = e[k][i]
+        e[k][i] = new
+        all_members[old]["duties"] -= 1
+        all_members[new]["duties"] += 1
+
+    def is_voca(m):
+        return norm(m) in vocas_norm
+
+    def balance_once():
+        """Najde retez predani od nejvytizenejsiho k nekomu s aspon o 2 mene sluzbami."""
+        loaded = sorted({h for _, _, _, h in holders() if not is_voca(h)}, key=count, reverse=True)
+        for start in loaded:
+            prev = {start: None}
+            queue = [start]
+            while queue:
+                u = queue.pop(0)
+                for e, k, i, h in holders():
+                    if h != u:
+                        continue
+                    for v in e["_pools"][k]:
+                        if v in prev or is_voca(v) or not eligible(v, e, k):
+                            continue
+                        prev[v] = (u, e, k, i)
+                        if count(v) <= count(start) - 2:
+                            chain = []
+                            node = v
+                            while prev[node]:
+                                u2, e2, k2, i2 = prev[node]
+                                chain.append((e2, k2, i2, node))
+                                node = u2
+                            for e2, k2, i2, new in chain:
+                                give(e2, k2, i2, new)
+                            return True
+                        queue.append(v)
+        return False
+
+    guard = 0
+    while balance_once() and guard < 1000:
+        guard += 1
+
+    def pref_score(m, k):
+        pref = preferences.get(m)
+        if pref is None:
+            return 0
+        return 1 if pref == ROLE_OF[k] else -1
+
+    def prefer_once():
+        """Preference jsou mekke: meni se jen to, co nezhorsi rozlozeni sluzeb."""
+        hs = holders()
+        # Vymena dvou lidi mezi dvema sluzbami (pocty sluzeb se nemeni)
+        for e1, k1, i1, a in hs:
+            for e2, k2, i2, b in hs:
+                if a == b or is_voca(a) or is_voca(b):
+                    continue
+                gain = (pref_score(a, k2) + pref_score(b, k1)) - (pref_score(a, k1) + pref_score(b, k2))
+                if gain <= 0:
+                    continue
+                if eligible(a, e2, k2, giving_up=(e1, k1, i1)) and eligible(b, e1, k1, giving_up=(e2, k2, i2)):
+                    e1[k1][i1], e2[k2][i2] = b, a
+                    return True
+        # Predani nekomu, kdo ma presne o jednu sluzbu min (rozlozeni zustane stejne)
+        for e1, k1, i1, a in hs:
+            if is_voca(a):
+                continue
+            for z in e1["_pools"][k1]:
+                if z == a or is_voca(z) or count(z) != count(a) - 1:
+                    continue
+                if pref_score(z, k1) > pref_score(a, k1) and eligible(z, e1, k1):
+                    give(e1, k1, i1, z)
+                    return True
+        return False
+
+    guard = 0
+    while prefer_once() and guard < 1000:
+        guard += 1
+
+    for e in result:
+        del e["_time"], e["_pools"]
     return result
 
 
@@ -531,6 +660,15 @@ class Handler(BaseHTTPRequestHandler):
                 if result.get("event_ts"):
                     STATE["selected_event_ts"] = result["event_ts"]
                 self.send_json({"ok": True, **result})
+            except Exception as e:
+                self.send_json({"error": str(e)}, 400)
+
+        elif path == "/api/spond_members":
+            if not SPOND_AVAILABLE or not SPOND_USERNAME or not SPOND_PASSWORD:
+                self.send_json({"error": "Spond není na serveru nastaven"}, 500)
+                return
+            try:
+                self.send_json({"ok": True, "members": asyncio.run(_spond_members())})
             except Exception as e:
                 self.send_json({"error": str(e)}, 400)
 
