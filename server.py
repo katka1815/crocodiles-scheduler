@@ -130,6 +130,10 @@ def fetch_tournify_firebase(live_link):
         day_id = d["name"].split("/")[-1]
         ts = fv(d.get("fields", {}).get("date", {}))
         day_map[day_id] = ts or 0
+    # Prvni hraci den nema vlastni dokument: zapasy maji day "0" a datum je primo u turnaje
+    first_day_ts = fv(tournament_doc.get("fields", {}).get("date", {}))
+    if "0" not in day_map and first_day_ts:
+        day_map["0"] = first_day_ts
 
     teams_docs = fs_list(f"tournaments/{tournament_id}/teams")
     poule_team_map = {}
