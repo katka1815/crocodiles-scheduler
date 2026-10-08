@@ -1,160 +1,209 @@
-# Turnajový scheduler – Prague Crocodiles
+# Prague Crocodiles – rozvrh služeb
 
-Tenhle nástroj ti pomůže připravit rozvrh služeb na dodgeballový turnaj.
-Automaticky přiřadí rozhodčí a podávající ke každému zápasu, spravedlivě
-a bez konfliktů (nikdo nemůže být na dvou místech najednou).
+Nástroj, který pro ligový den rozdělí pískání a podávání mezi hráče Prague
+Crocodiles: vezme rozpis z Tournify a docházku ze Spondu a ke každému zápasu
+přiřadí rozhodčí a podávající tak, aby nikdo nebyl na dvou místech najednou a
+aby měli všichni zhruba stejně služeb.
 
----
+Stav popsaný v tomhle dokumentu platí od října 2026. Co se tehdy opravovalo a
+proč, je v kapitole [Co nefungovalo dřív](#co-nefungovalo-dřív).
 
-## Co budeš potřebovat
+## Z čeho se to skládá
 
-- Počítač s Windowsem (nebo Mac/Linux)
-- Připojení k internetu
-- Přihlašovací údaje do Spondu (email + heslo)
-- Group ID skupiny Prague Crocodiles ve Spondu
+| Část | Kde je | K čemu je |
+|---|---|---|
+| Server | tenhle repozitář, `server.py`, běží na Fly.io | Stahuje Tournify a Spond, počítá rozvrh, pamatuje si poslední rozvrh |
+| Mobilní appka | repozitář `crocodiles-mobile` (Expo / React Native, Android) | Tady se rozvrh připravuje: týmy, docházka, preference, generování, výměny |
+| Veřejná stránka | `frontend.html`, servíruje ji server | Jen pro čtení, pro spoluhráče: https://crocodiles-scheduler.fly.dev |
 
----
+Rozvrh se vždy **počítá na serveru**. Appka je ovladač: pošle serveru týmy,
+docházku, vocasy a preference a zobrazí výsledek. Veřejná stránka ukazuje
+poslední vygenerovaný rozvrh a sama se každých 30 vteřin obnovuje.
 
-## Instalace (jenom jednou)
+## Jak se to používá (appka)
 
-### Krok 1 – Nainstaluj Python
-
-**Windows:**
-1. Jdi na https://python.org/downloads
-2. Stáhni nejnovější verzi (velké žluté tlačítko)
-3. Spusť instalátor – **zaškrtni "Add Python to PATH"** (důležité!)
-4. Klikni Install Now
-
-**Mac:**
-- Python je většinou už nainstalovaný. Zkus v Terminálu napsat `python3 --version`
-
-### Krok 2 – Nainstaluj knihovnu pro Spond
-
-Otevři terminál (na Windows: zmáčkni Win + R, napiš `cmd`, Enter) a napiš:
-
-```
-pip install spond
-```
-
-Počkej až se doinstaluje, pak terminál nech otevřený.
-
----
-
-## Jak spustit
-
-1. Rozbal ZIP se soubory někam na plochu (třeba složka `spond_scheduler`)
-2. V terminálu přejdi do té složky:
-   ```
-   cd C:\Users\TvojeJmeno\Desktop\spond_scheduler
-   ```
-3. Spusť server:
-   ```
-   py server.py
-   ```
-   (Pokud `py` nefunguje, zkus `python server.py` nebo `python3 server.py`)
-
-4. Uvidíš hlášku že server běží. **Terminál nech otevřený!**
-5. Otevři prohlížeč a jdi na adresu: **http://localhost:8765**
-
----
-
-## Jak to používat
-
-### Krok 1 – Načti rozpis z Tournify
-
-- URL turnaje je předvyplněná, stačí kliknout **Načíst z Tournify**
-- Stáhne se celý letošní rozvrh automaticky (žádné CSV, žádný export)
-
-### Krok 2 – Zjisti kdo přijde
-
-Máš dvě možnosti:
-
-**Možnost A – přes Spond (doporučeno):**
-1. Zadej svůj Spond email a heslo
-2. Group ID je předvyplněné, nemusíš měnit
-3. Klikni **Zkontrolovat účast**
-4. Zobrazí se seznam akcí – vyber tu správnou (zvýrazněné jsou ty co sedí na datum z Tournify)
-5. Uvidíš kdo potvrdil, kdo odmítl, kdo neodpověděl
-6. Zaškrtávátky uprav seznam (někdo se zapomněl přihlásit apod.)
-7. Klikni **Potvrdit tento seznam**
-
-**Možnost B – bez Spondu:**
-1. Klikni **Použít všechny členy**
-2. Vyber datum herního dne ze seznamu tlačítek
-
-### (Volitelně) Nastav preference hráčů
-
-Pod sekcí účasti je **Preference hráčů** – rozbal ji a nastav každému:
-- **rozhodčí** – radši píská
-- **podavač** – radši podává
-- **je mi to jedno** – výchozí stav
-
-Preference ovlivní výběr při stejném počtu služeb, ale nepřebíjí spravedlnost –
-každý bude mít přibližně stejný počet služeb bez ohledu na preferenci.
-
-### Krok 3 – Vygeneruj rozvrh
-
-- Klikni **Vygenerovat rozvrh**
-- Zobrazí se tabulka se všemi zápasy kde Prague Crocodiles něco dělají
-  (zápasy cizích týmů bez naší účasti jsou skryté)
-
-### Jak přečíst tabulku
-
-| Sloupec | Co znamená |
-|---|---|
-| Hrají | Který náš tým hraje (je celý zaneprázdněný) |
-| Rozhodčí | 4 lidi co pískají (název týmu nad jmény) |
-| Podávání | 3 lidi co podávají (název týmu nad jmény) |
-
-### Nahradit hráče
-
-Pokud někdo nemůže (zranil se, odjel...), klikni na jeho jméno v tabulce.
-Otevře se okno se seznamem dostupných náhradníků – vyber jiného, tabulka
-se okamžitě přepíše.
-
-### Stažení PNG
-
-Klikni **PNG** – stáhne se obrázek tabulky, který můžeš sdílet v Messengeru.
-
----
+1. **Složení týmů.** Kdo je v jakém týmu (Mix A, Mix B, Muži, Ženy). Hráč může
+   být ve více týmech. Každá změna se hned uloží do telefonu. V nabídce jsou
+   všichni členové Spond skupiny, nové jméno jde i napsat ručně (musí být
+   stejně jako ve Spondu, jinak se nespáruje s docházkou).
+2. **Tournify + Spond.** Zadá se Tournify „live link" (letos `cdbl2627`),
+   načte se rozpis a vybere se Spond event. Appka ukáže, kdo jde, kdo ne a kdo
+   neodpověděl; neodpovězené jde zaškrtnout ručně. Herní den se vybere sám,
+   pokud na event sedí, jinak se vybírá ručně. Spond jde i přeskočit, pak se
+   počítá se všemi členy.
+3. **Vocasové a preference.** Vocas = někdo, kdo má službu přednostně.
+   Preference = kdo radši píská a kdo radši podává. Preference se ukládají.
+4. **Výsledky.** Rozvrh s filtry, přehled po hráčích, přehled spravedlnosti,
+   výměna hráče za volného a sdílení obrázku.
 
 ## Pravidla přiřazování
 
-- **Hraní** je uvedeno v rozpisu – celý tým hraje, nikdo z něj nemůže nic dalšího
-- **Pískání** je taky z rozpisu – přiřadí se 4 lidi z toho týmu
-- **Podávání** se určuje podle hrajícího týmu:
-  - Prague Crocodiles A MIX hraje → podává Mix B
-  - Prague Crocodiles B MIX hraje → podává Mix A
-  - Prague Crocodiles M hraje → podávají Ženy
-  - Prague Crocodiles Ž hraje → podávají Muži
-- Nikdo nemůže dělat dvě věci najednou (ani v různých zápasech ve stejný čas)
-- Pokud je tým ve stejnou hodinu rozhodčí i podávající, 4 rozhodčí se vyberou první,
-  podávající se volí ze zbytku
-- Celkový počet služeb je co nejrovnoměrnější
+- **Hraní** je dané rozpisem. Kdo je v hrajícím týmu, nemůže v tom čase dělat
+  nic jiného, a to ani na jiném kurtu.
+- **Pískání** je taky z rozpisu: když Tournify určí jako rozhodčí náš tým,
+  vyberou se z něj 4 lidi.
+- **Podávání** se řídí hrajícím týmem, vybírají se 3 lidi:
+  - hraje A MIX → podává Mix B
+  - hraje B MIX → podává Mix A
+  - hrají Muži → podávají Ženy
+  - hrají Ženy → podávají Muži
+- Nikdo nemá dvě služby ve stejný čas.
+- Když je jeden tým ve stejnou hodinu rozhodčí i podávající, vyberou se nejdřív
+  4 rozhodčí a podávající ze zbytku.
 
----
+## Jak se rozvrh počítá
 
-## Něco nefunguje?
+Výpočet je ve funkci `assign_duties` v `server.py` a má tři fáze.
 
-**"Server nedostupný"**
-→ Zkontroluj že terminál s `py server.py` stále běží. Pokud ne, spusť znovu.
+1. **První rozdělení.** Zápasy se projdou v čase a na každou službu se vezmou
+   ti, kdo jsou volní a mají zatím nejméně služeb (vocasové mají přednost,
+   při shodě rozhoduje preference). Ještě před tím se všem hrajícím zablokují
+   časy jejich zápasů pro celý den.
+2. **Dorovnání.** První rozdělení je krátkozraké: neví, že někdo později skoro
+   nebude volný. Proto se potom hledají řetězy předání: služba se přesune od
+   nejvytíženějšího k někomu, kdo má aspoň o dvě méně, případně přes
+   prostředníky (A předá B, B jinou službu předá C). Opakuje se, dokud to jde.
+   Cíl je, aby rozdíl mezi nejvíc a nejmíň vytíženým byl nejvýš 1.
+3. **Preference.** Nakonec se zkouší výměny, které zlepší splnění preferencí a
+   přitom nezmění rozložení služeb: dva lidé si prohodí služby, nebo službu
+   převezme někdo, kdo má přesně o jednu méně. Preference je tedy měkká: kdo
+   radši píská, dostane přednostně pískání, ale když vychází místo jen na
+   podávání, podává.
 
-**pip install spond nefunguje**
-→ Zkus `pip3 install spond` nebo `python -m pip install spond`
+Vocasové si svou přednost drží a do dorovnávání se nezapočítávají.
 
-**Chyba přihlášení do Spondu**
-→ Zkontroluj email a heslo. Group ID musí být přesně zkopírované z URL skupiny:
-spond.com/client/groups/TOTO_JE_GROUP_ID/
+**Proč rozdíl někdy vyjde větší než 1:** služby se berou jen z týmu, který
+podle rozpisu píská nebo podává. Když něčí tým v daný den nepíská ani
+nepodává, nedostane ten člověk nic, a to se dorovnat nedá.
 
-**Tournify nenačte data**
-→ Zkontroluj připojení k internetu. URL turnaje musí obsahovat /live/cdbl2526/
+## Kde jsou která data
 
-**Server běží ale v prohlížeči nic není**
-→ Zkus adresu http://127.0.0.1:8765 místo localhost:8765
+| Co | Kde | Poznámka |
+|---|---|---|
+| Složení týmů | telefon (`custom_teams`) | Přežije aktualizaci appky, ne odinstalování |
+| Známí hráči | telefon (`known_players`) | Plní se ze Spondu |
+| Poslední Tournify odkaz | telefon (`tournify_link`) | |
+| Preference | telefon (`saved_preferences`) | |
+| Poslední rozvrh v appce | telefon (`saved_schedule`) | |
+| Poslední rozvrh pro web | server, soubor `/data/schedule.json` | Přežije restart serveru |
+| Načtený rozpis, docházka | paměť serveru | Po restartu serveru se ztratí, appka je pošle znovu |
+| Přihlášení do Spondu | Fly.io secrets | `SPOND_USERNAME`, `SPOND_PASSWORD`, volitelně `SPOND_GROUP_ID` |
 
-**Chceš změnit seznam hráčů nebo týmů**
-→ Otevři server.py v poznámkovém bloku, najdi sekci MEMBERS_BY_TEAM a uprav jména.
-  Po uložení restartuj server (Ctrl+C a znovu py server.py).
+Týmy zapsané v `server.py` (`MEMBERS_BY_TEAM`) jsou jen výchozí hodnota pro
+případ, že by appka žádné neposlala. Platí vždy to, co pošle appka.
+
+## Nová sezóna a jiné změny
+
+- **Nový rozpis:** v appce na druhé stránce zadej nový Tournify odkaz. Appka si
+  ho zapamatuje. Nic v kódu se měnit nemusí.
+- **Nový hráč:** objeví se v nabídce sám, jakmile je ve Spond skupině. Stačí ho
+  na první stránce přidat do týmů.
+- **Tým se v Tournify jmenuje jinak nebo přibyl nový:** tohle je jediná věc,
+  která chce úpravu kódu. Názvy se párují na dvou místech:
+  - `server.py`: `TOURNIFY_TO_SUBGROUP` (název v Tournify → náš tým) a
+    `PLAYING_SERVED_BY` (kdo komu podává),
+  - appka, `app/index.tsx`: `tournifyToTeamKey`, `DEFAULT_TEAMS`, `TEAM_COLORS`.
+
+## Nasazení
+
+**Server:** push do větve `main` spustí GitHub Action (`.github/workflows/fly-deploy.yml`),
+která nasadí na Fly.io. Trvá to pár minut.
+
+**Appka:** v repozitáři `crocodiles-mobile`:
+
+```
+npx eas-cli build --platform android --profile preview
+```
+
+Výsledkem je odkaz na APK, který se nainstaluje přes stávající appku. Na free
+tarifu EAS může build čekat ve frontě i přes hodinu.
+
+**Lokální spuštění serveru:**
+
+```
+pip install -r requirements.txt
+python server.py
+```
+
+Server poběží na http://localhost:8765. Bez proměnných `SPOND_USERNAME` a
+`SPOND_PASSWORD` funguje všechno kromě Spondu.
+
+## API serveru
+
+Všechno kromě prvních tří řádků je `POST` s JSON tělem.
+
+| Cesta | Co dělá |
+|---|---|
+| `GET /` | Veřejná stránka s rozvrhem |
+| `GET /api/assignments` | Poslední rozvrh |
+| `GET /api/status` | Stav serveru (počet načtených zápasů, docházka) |
+| `/api/load_tournify` | Načte rozpis podle `live_link` |
+| `/api/spond_events` | Nadcházející Spond eventy |
+| `/api/spond_attendance` | Docházka na event: jdou, nejdou, neodpověděli |
+| `/api/spond_members` | Všichni členové Spond skupiny |
+| `/api/set_teams` | Složení týmů z appky |
+| `/api/set_attending` | Kdo je přítomen a který den se počítá |
+| `/api/set_vocas` | Vocasové |
+| `/api/set_preferences` | Preference rozhodčí / podávající |
+| `/api/assign` | Spočítá rozvrh a uloží ho |
+| `/api/replace_player` | Vymění jednoho člověka ve službě |
+
+## Co nefungovalo dřív
+
+Opravy z října 2026, od příznaku k příčině.
+
+**1. Hráč nešel přidat do týmu.**
+Jakub Kopáč se nenabízel pro Mix B. Výběr totiž po načtení Spond eventu
+nabízel jen lidi, kteří na ten event potvrdili účast.
+*Teď:* nabízí se všichni známí hráči (týmy + celá Spond skupina) a jméno jde
+napsat i ručně.
+
+**2. Hrající dostali podávání.**
+Týmy upravené v appce se ukládaly jen do telefonu. Server, který rozvrh počítá,
+je nikdy nedostal a jel podle svých výchozích týmů. Kdo byl v appce přesunutý
+do jiného mixu, byl pro server pořád v tom původním, a mohl tak dostat službu
+v čase, kdy hraje.
+*Teď:* appka před každým generováním pošle týmy serveru (`/api/set_teams`).
+
+**3. Načítal se loňský rozvrh (neděle 17. 5.).**
+V appce byl natvrdo loňský odkaz `cdbl2526`. Ke Spond eventu se pak tiše
+vybral nejbližší hrací den, což byl poslední den loňské sezóny.
+*Teď:* výchozí je `cdbl2627`, appka si pamatuje poslední zadaný odkaz, a když
+event na žádný hrací den nesedí, řekne to a nechá den vybrat ručně.
+
+**4. Chyběl první hrací den sezóny.**
+Tournify ukládá první den jinak než ostatní: jeho zápasy mají den `0` a datum
+je jen u turnaje samotného. Server takové zápasy zahazoval. Letos tak chyběla
+sobota 10. 10. (31 zápasů), loni stejně vypadl 9. 11.
+*Teď:* den `0` se bere z data turnaje.
+
+**5. Hraní na jiném kurtu ve stejný čas.**
+Hrající se blokovali až ve chvíli, kdy výpočet došel k jejich zápasu. Zápas na
+jiném kurtu ve stejný čas, který přišel na řadu dřív, jim tak mohl přidělit
+službu. Tohle se našlo při čtení kódu, v reálném rozvrhu nahlášené nebylo.
+*Teď:* časy hraní se zablokují předem pro celý den.
+
+**6. Nerovnoměrné služby a slabé preference.**
+Výpočet končil prvním rozdělením (fáze 1 výše), takže někdo mohl mít o dvě
+služby víc než jiný, i když to šlo rozdělit líp, a preference rozhodovala jen
+při shodě počtu služeb.
+*Teď:* přibyly fáze dorovnání a preferencí.
+
+**7. Pořadí stránek v appce.**
+Dřív: 1. Tournify (týmy schované za tlačítkem), 2. Spond, 3. preference.
+*Teď:* 1. týmy, 2. Tournify + Spond, 3. vocasové a preference.
+
+## Známá omezení
+
+- Čtyři týmy jsou dané a párují se na názvy „Prague Crocodiles A MIX / B MIX /
+  M / Ž" (viz Nová sezóna).
+- Server drží rozpracovaný stav v paměti a počítá s tím, že rozvrh připravuje
+  jeden člověk. Dva lidé generující naráz by si ho přepisovali.
+- Když se vybere hrací den, server vezme zápasy do 1,5 dne od něj. Sobota a
+  neděle jednoho víkendu se proto generují dohromady a služby se vyrovnávají
+  přes celý víkend.
+- Týmy jsou uložené v telefonu, ne na serveru. Po odinstalování appky nebo na
+  novém telefonu se začíná z výchozích.
 
 ---
 

@@ -12,7 +12,7 @@ except ImportError:
     SPOND_AVAILABLE = False
     print("pip install spond")
 
-# Spond credentials z Railway environment variables
+# Spond credentials z environment variables (na Fly.io jako secrets)
 SPOND_USERNAME = os.environ.get("SPOND_USERNAME", "")
 SPOND_PASSWORD = os.environ.get("SPOND_PASSWORD", "")
 SPOND_GROUP_ID = os.environ.get("SPOND_GROUP_ID", "DDEC85288D0442F38F280F4420E045DC")

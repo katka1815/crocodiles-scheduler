@@ -1,4 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+
+# staré lokální soubory, do repa nepatří
 flyctl.zip
 flyctl_old/
 dodgeball appky/
-name Deploy to Fly.io.txt
